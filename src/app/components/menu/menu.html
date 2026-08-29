@@ -1,0 +1,37 @@
+<div class="menu-container">
+  <!-- Campo Path y botón -->
+  <div class="path-row">
+    <div class="path-box">
+      <span class="path-text">{{ currentPath }}</span>
+    </div>
+    <button class="path-action-btn" aria-label="Abrir carpeta">
+      <fa-icon [icon]="faFolderOpen" class="fa-icon"></fa-icon>
+    </button>
+  </div>
+
+  <!-- Sección Marcadores -->
+  <div class="marcadores-section">
+    <h2 class="marcadores-title">Marcadores:</h2>
+    
+    <div class="list-container">
+      <div class="list-content">
+        @for (item of bookmarks(); track item; let i = $index) {
+          <div 
+            class="bookmark-item"
+            [class.selected]="i === selectedBookmarkIndex()"
+            (click)="selectBookmark(i)">
+            <fa-icon [icon]="faBookmark" class="item-icon"></fa-icon>
+            <span>{{ item }}</span>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+
+  <!-- Botón Mover -->
+  <div class="action-row">
+    <button class="btn-mover" (click)="onMove()">
+      Mover
+    </button>
+  </div>
+</div>

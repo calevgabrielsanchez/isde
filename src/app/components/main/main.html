@@ -1,0 +1,25 @@
+<div class="app-viewport">
+  <div class="app-container">
+    <!-- Cabecera de la aplicación -->
+    <header class="app-header">
+      <button class="header-section menu-button" (click)="toggleMenu()" aria-label="Abrir menú">
+        <fa-icon [icon]="faBars" class="fa-icon"></fa-icon>
+      </button>
+
+      <div class="header-section title-section">
+        <span class="app-title">isDe</span>
+      </div>
+
+      <button class="header-section profile-button" aria-label="Perfil de usuario">
+        <fa-icon [icon]="faSmile" class="fa-icon"></fa-icon>
+      </button>
+    </header>
+
+    <!-- Área principal de contenido -->
+    <main class="app-content">
+        @if(isMenuOpen){
+          <app-menu></app-menu>
+        }
+    </main>
+  </div>
+</div>

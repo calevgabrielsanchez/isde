@@ -1,0 +1,199 @@
+.menu-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+  height: 100%;
+  box-sizing: border-box;
+  color: var(--text-color, #00558a);
+  background-color: var(--bg-app, #2c2c31);
+}
+
+/* --- Path Row --- */
+.path-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.path-box {
+  flex: 1;
+  background-color: var(--bg-header, #37373e);
+  border: 2px solid var(--border-color, #00558a);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+}
+
+.path-text {
+  color: var(--text-color, #00558a);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.path-action-btn {
+  width: 48px;
+  height: 48px;
+  background-color: var(--bg-header, #37373e);
+  border: 2px solid var(--border-color, #00558a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.path-action-btn:hover {
+  opacity: 0.85;
+}
+
+/* --- Marcadores Section --- */
+.marcadores-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.marcadores-title {
+  color: var(--text-color, #00558a);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Contenedor de lista según el prototipo */
+.list-container {
+  display: flex;
+  border: 2px solid var(--border-color, #00558a);
+  background-color: var(--bg-header, #37373e);
+  height: 240px;
+  overflow: hidden;
+}
+
+.list-content {
+  flex: 1;
+  padding: 10px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.list-content::-webkit-scrollbar {
+  display: none;
+}
+
+.bookmark-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-color, #00558a);
+  transition: background-color 0.2s;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 1rem;
+}
+
+.bookmark-item:hover {
+  background-color: rgba(0, 85, 138, 0.15);
+}
+
+.bookmark-item.selected {
+  background-color: rgba(0, 85, 138, 0.3);
+  border: 1px solid var(--border-color, #00558a);
+  font-weight: bold;
+}
+
+.item-icon {
+  color: var(--fontawesome-color, #cb00b0);
+}
+
+/* Barra de scroll lateral personalizada */
+.custom-scrollbar {
+  width: 32px;
+  border-left: 2px solid var(--border-color, #00558a);
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-app, #2c2c31);
+}
+
+.scroll-btn {
+  height: 32px;
+  background-color: var(--bg-header, #37373e);
+  border: none;
+  color: var(--fontawesome-color, #cb00b0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.scroll-btn.top {
+  border-bottom: 2px solid var(--border-color, #00558a);
+}
+
+.scroll-btn.bottom {
+  border-top: 2px solid var(--border-color, #00558a);
+}
+
+.scroll-track {
+  flex: 1;
+  position: relative;
+  background-color: var(--bg-app, #2c2c31);
+}
+
+.scroll-thumb {
+  position: absolute;
+  top: 10%;
+  left: 2px;
+  right: 2px;
+  height: 40%;
+  background-color: var(--bg-header, #37373e);
+  border: 1px solid var(--border-color, #00558a);
+}
+
+/* --- Botón Mover --- */
+.action-row {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 10px 0;
+}
+
+.btn-mover {
+  width: 85%;
+  padding: 12px 24px;
+  background-color: var(--bg-header, #37373e);
+  color: var(--text-color, #00558a);
+  border: 2px solid var(--border-color, #00558a);
+  box-shadow: inset 0 0 0 2px var(--bg-app, #2c2c31), 0 4px 8px rgba(0, 0, 0, 0.3);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 1.3rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.1s, background-color 0.2s, color 0.2s;
+  text-align: center;
+}
+
+.btn-mover:hover {
+  background-color: var(--border-color, #00558a);
+  color: var(--bg-app, #2c2c31);
+}
+
+.btn-mover:active {
+  transform: translateY(2px);
+}
+
+.fa-icon {
+  color: var(--fontawesome-color, #cb00b0);
+  font-size: 1.3rem;
+}

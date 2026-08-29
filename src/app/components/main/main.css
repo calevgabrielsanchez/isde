@@ -1,0 +1,111 @@
+/* Variables de color especificadas */
+:host {
+  --bg-body: #222226;
+  --bg-app: #2c2c31;
+  --bg-header: #37373e;
+  --border-color: #00558a;
+  --text-color: #62c0f4;
+  --fontawesome-color: #cb00b0;
+  
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--bg-body);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Envoltorio principal que centra la app en escritorio */
+.app-viewport {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--bg-body);
+}
+
+/* Contenedor principal de la app */
+.app-container {
+  background-color: var(--bg-app);
+  border: 4px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  
+  /* Celular: Ocupa el 100% del alto y ancho */
+  width: 100%;
+  height: 100%;
+}
+
+/* En pantallas de escritorio se mantiene proporcional según el wireframe */
+@media (min-width: 768px) {
+  .app-container {
+    /* Mantiene relación de aspecto (~2:3 o 3:4 típica de pantallas móviles) */
+    aspect-ratio: 2 / 3;
+    height: 95vh;
+    width: auto;
+    max-width: 100%;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* --- Cabecera --- */
+.app-header {
+  display: flex;
+  height: 80px;
+  background-color: var(--bg-header);
+  border-bottom: 2px solid var(--border-color);
+}
+
+.header-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+/* Menú lateral (Izquierda) */
+.menu-button {
+  width: 80px;
+  border-right: 2px solid var(--border-color);
+  cursor: pointer;
+}
+
+/* Título central */
+.title-section {
+  flex: 1;
+}
+
+.app-title {
+  color: var(--text-color);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 1.8rem;
+  font-weight: bold;
+}
+
+/* Icono de perfil (Derecha) */
+.profile-button {
+  width: 80px;
+  border-left: 2px solid var(--border-color);
+  cursor: pointer;
+}
+
+/* Estilo para los íconos FontAwesome */
+.fa-icon {
+  color: var(--fontawesome-color);
+  font-size: 2.2rem;
+}
+
+/* --- Área de Contenido --- */
+.app-content {
+  flex: 1;
+  background-color: var(--bg-app);
+  overflow-y: auto;
+}
