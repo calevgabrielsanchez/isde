@@ -15,6 +15,17 @@ export interface BrowserEntry {
 
 export const MAX_FILES = 150;
 
+const TEXT_EXTENSION = /\.(txt|text|md|markdown|json|jsonc|csv|tsv|log|xml|html|htm|css|scss|sass|less|yaml|yml|toml|ini|cfg|conf|js|mjs|cjs|ts|tsx|jsx|py|rb|php|java|c|cc|cpp|h|hpp|go|rs|swift|kt|sh|bash|zsh|bat|cmd|ps1|sql|env|properties|vue|svelte|gitignore|dockerfile|editorconfig|lock|glsl|vert|frag)$/i;
+const TEXT_FILENAMES = /^(readme|read_me|license|copying|copyright|changelog|changes|authors|citation|notice|manifest|makefile|dockerfile|gemfile|rakefile|gruntfile|gulpfile|package|composer|pyproject|pom|build|tsconfig)$/i;
+
+export function isTextFileName(name: string): boolean {
+  const clean = name.trim();
+  if (/^\./.test(clean) || clean.includes('.')) {
+    return TEXT_EXTENSION.test(clean);
+  }
+  return TEXT_FILENAMES.test(clean);
+}
+
 @Injectable({ providedIn: 'root' })
 export class FileBrowserService {
 

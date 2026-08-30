@@ -4,8 +4,17 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import {
   faFolderOpen, faBookmark, faChevronUp, faChevronDown,
   faHeart, faStar, faDownload, faImage, faMusic, faVideo, faFolder, faCamera, faCode,
-  faPlus, faFilePen, faKey, faTrash,
-  faCircle, faSquare, faCube, faSeptagon, faPentagon, faOctagon, faHexagon, faShapes,
+  faPlus, faFilePen, faKey, faTrash, faCheck,
+  faCircle, faSquare, faCube, faSeptagon, faPentagon, faOctagon, faHexagon, faShapes, 
+  faGhost, faDragon, faCrow, faDemocrat, faLandmark, faRepublican, faTrophy, 
+  faChess, faChessKnight, faChessPawn, faChessRook, faChessBishop, faChessQueen, faChessKing,
+  faDiamond, faGem, faCloud, faComment, faEnvelope, faPaperPlane, faPaperclip, faThumbsUp, faThumbsDown,
+  faTruck, faCar, faBicycle, faBus, faTrain, faShip, faPlane, faRocket, faSubway, faMotorcycle,
+  faWebAwesome, faHippo, faHorse, faDog, faCat, faFish, faFrog, faSpider, 
+faFire, faWater, faLeaf, faTree, faMountain, faSun, faMoon, faStarHalf, faHouse,
+faPerson, faPersonDress, faGamepad, faPuzzlePiece, faLightbulb, faBook, faGraduationCap, faLaptop, faMobile, 
+faFishFins, faBug, faPalette, faPencil, faBuilding, faSeedling, faRadio, faRadiation, faSpaghettiMonsterFlying,
+faSkull, faSkullCrossbones, faScrewdriverWrench
 } from '@fortawesome/free-solid-svg-icons';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import { Capacitor } from '@capacitor/core';
@@ -67,15 +76,23 @@ export class Menu implements OnInit {
   faFilePen = faFilePen;
   faKey = faKey;
   faTrash = faTrash;
+  faCheck = faCheck;
   isNative = Capacitor.isNativePlatform();
 
   private readonly browser = inject(FileBrowserService);
 
   readonly selectedPath = input<string>('');
   readonly permissionMap = input<Record<string, boolean>>({});
+  readonly rootTreeUri = input<string | undefined>(undefined);
   readonly folderSelected = output<string>();
   readonly bookmarksChange = output<BookmarkItem[]>();
   readonly moveTriggered = output<void>();
+  readonly grantAllAccess = output<void>();
+  allAccessGranted = computed(() => !!this.rootTreeUri());
+
+  onGrantAllAccess(): void {
+    this.grantAllAccess.emit();
+  }
   selectedBookmarkIndex = signal<number>(0);
   selectedDirectory = signal<FileSystemDirectoryHandle | null>(null);
   selectedFolderPath = signal<string | null>(null);
@@ -107,6 +124,77 @@ export class Menu implements OnInit {
     { label: 'Octágono', icon: faOctagon },
     { label: 'Hexágono', icon: faHexagon },
     { label: 'Formas', icon: faShapes },
+    { label: 'Fantasma', icon: faGhost },
+    { label: 'Dragón', icon: faDragon },
+    { label: 'Cuervo', icon: faCrow },
+    { label: 'Demócrata', icon: faDemocrat },
+    { label: 'Monumento', icon: faLandmark },
+    { label: 'Republicano', icon: faRepublican },
+    { label: 'Trofeo', icon: faTrophy },
+    { label: 'Ajedrez', icon: faChess },
+    { label: 'Caballo ajedrez', icon: faChessKnight },
+    { label: 'Peón ajedrez', icon: faChessPawn },
+    { label: 'Torre ajedrez', icon: faChessRook },
+    { label: 'Alfil ajedrez', icon: faChessBishop },
+    { label: 'Reina ajedrez', icon: faChessQueen },
+    { label: 'Rey ajedrez', icon: faChessKing },
+    { label: 'Diamante', icon: faDiamond },
+    { label: 'Gema', icon: faGem },
+    { label: 'Nube', icon: faCloud },
+    { label: 'Comentario', icon: faComment },
+    { label: 'Sobre', icon: faEnvelope },
+    { label: 'Avión papel', icon: faPaperPlane },
+    { label: 'Clip', icon: faPaperclip },
+    { label: 'Pulgar arriba', icon: faThumbsUp },
+    { label: 'Pulgar abajo', icon: faThumbsDown },
+    { label: 'Camión', icon: faTruck },
+    { label: 'Coche', icon: faCar },
+    { label: 'Bicicleta', icon: faBicycle },
+    { label: 'Autobús', icon: faBus },
+    { label: 'Tren', icon: faTrain },
+    { label: 'Barco', icon: faShip },
+    { label: 'Avión', icon: faPlane },
+    { label: 'Cohete', icon: faRocket },
+    { label: 'Metro', icon: faSubway },
+    { label: 'Moto', icon: faMotorcycle },
+    { label: 'Web Awesome', icon: faWebAwesome },
+    { label: 'Hipopótamo', icon: faHippo },
+    { label: 'Caballo', icon: faHorse },
+    { label: 'Perro', icon: faDog },
+    { label: 'Gato', icon: faCat },
+    { label: 'Pez', icon: faFish },
+    { label: 'Rana', icon: faFrog },
+    { label: 'Araña', icon: faSpider },
+    { label: 'Fuego', icon: faFire },
+    { label: 'Agua', icon: faWater },
+    { label: 'Hoja', icon: faLeaf },
+    { label: 'Árbol', icon: faTree },
+    { label: 'Montaña', icon: faMountain },
+    { label: 'Sol', icon: faSun },
+    { label: 'Luna', icon: faMoon },
+    { label: 'Media estrella', icon: faStarHalf },
+    { label: 'Casa', icon: faHouse },
+    { label: 'Persona', icon: faPerson },
+    { label: 'Persona vestida', icon: faPersonDress },
+    { label: 'Videojuegos', icon: faGamepad },
+    { label: 'Rompecabezas', icon: faPuzzlePiece },
+    { label: 'Bombilla', icon: faLightbulb },
+    { label: 'Libro', icon: faBook },
+    { label: 'Graduación', icon: faGraduationCap },
+    { label: 'Portátil', icon: faLaptop },
+    { label: 'Móvil', icon: faMobile },
+    { label: 'Pez con aletas', icon: faFishFins },
+    { label: 'Bicho', icon: faBug },
+    { label: 'Paleta', icon: faPalette },
+    { label: 'Lápiz', icon: faPencil },
+    { label: 'Edificio', icon: faBuilding },
+    { label: 'Plántula', icon: faSeedling },
+    { label: 'Radio', icon: faRadio },
+    { label: 'Radiación', icon: faRadiation },
+    { label: 'Espagueti volador', icon: faSpaghettiMonsterFlying },
+    { label: 'Calavera', icon: faSkull },
+    { label: 'Calavera huesos', icon: faSkullCrossbones },
+    { label: 'Desarmador-llave', icon: faScrewdriverWrench },
   ];
 
   selectedBookmarkIconIndex = signal<number>(0);
@@ -376,14 +464,26 @@ export class Menu implements OnInit {
 
       input.onchange = () => {
         const files = input.files;
+        const value = input.value;
         input.remove();
         if (!files || files.length === 0) {
-          resolve(null);
+          const folderName = this.folderNameFromFileInputValue(value);
+          if (folderName) {
+            resolve(`/${folderName}`);
+            return;
+          }
+          const typedName = window.prompt('La carpeta elegida está vacía. Escribe su nombre:');
+          resolve(typedName ? `/${typedName.trim()}` : null);
           return;
         }
         const firstFile = files[0] as File & { webkitRelativePath?: string };
         const folderName = firstFile.webkitRelativePath?.split('/')[0] ?? firstFile.name;
         resolve(`/${folderName}`);
+      };
+
+      input.oncancel = () => {
+        input.remove();
+        resolve(null);
       };
 
       document.body.appendChild(input);
@@ -680,6 +780,12 @@ export class Menu implements OnInit {
 
   private nameFromPath(path: string): string {
     return decodeURIComponent(path.replace(/\/+$/, '')).split('/').pop() ?? path;
+  }
+
+  private folderNameFromFileInputValue(value: string): string {
+    const normalized = value.replace(/\\/g, '/');
+    const segments = normalized.split('/').filter((segment) => segment.length > 0);
+    return segments.length > 0 ? decodeURIComponent(segments[segments.length - 1]) : '';
   }
 
   private rootPathFromPickedPath(path: string): string {

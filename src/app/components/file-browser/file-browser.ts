@@ -1,14 +1,41 @@
-import { Component, computed, inject, input, signal } from '@angular/core';
+import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faFile, faFolder, faFileImage } from '@fortawesome/free-solid-svg-icons';
+import { faFile, faFolder, faFileImage,
+  faFilePdf, faFileWord, faFileExcel, faFilePowerpoint, faFileAudio, faFileVideo,
+  faFileCode, faFileZipper, faFileCsv, faFileLines } from '@fortawesome/free-solid-svg-icons';
+import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem } from '@capacitor/filesystem';
-import { FileBrowserService, type BrowserEntry } from '../../services/file-browser.service';
+import { FileBrowserService, isTextFileName, type BrowserEntry } from '../../services/file-browser.service';
 import { FileTree } from '../../services/file-tree.plugin';
 import type { BookmarkItem } from '../menu/menu';
 
 export type BookmarkEdge = 'top' | 'bottom' | 'left' | 'right';
+
+const PLAYABLE_VIDEO = /\.(mp4|webm|m4v|ogv|mov|mkv|3gp|3g2)$/i;
+const PLAYABLE_AUDIO = /\.(mp3|m4a|ogg|oga|wav|flac|aac|opus|wma)$/i;
+const PLAYABLE_PDF = /\.pdf$/i;
+
+const FILE_ICON_BY_EXTENSION: Record<string, IconDefinition> = {
+  pdf: faFilePdf,
+  doc: faFileWord, docx: faFileWord, rtf: faFileWord, odt: faFileWord,
+  xls: faFileExcel, xlsx: faFileExcel, ods: faFileExcel, csv: faFileCsv,
+  ppt: faFilePowerpoint, pptx: faFilePowerpoint, odp: faFilePowerpoint,
+  zip: faFileZipper, rar: faFileZipper, '7z': faFileZipper, tar: faFileZipper, gz: faFileZipper, bz2: faFileZipper,
+  mp3: faFileAudio, m4a: faFileAudio, wav: faFileAudio, ogg: faFileAudio, flac: faFileAudio,
+  aac: faFileAudio, opus: faFileAudio, wma: faFileAudio, oga: faFileAudio,
+  mp4: faFileVideo, webm: faFileVideo, m4v: faFileVideo, ogv: faFileVideo, avi: faFileVideo,
+  mov: faFileVideo, mkv: faFileVideo, '3gp': faFileVideo, '3g2': faFileVideo,
+  js: faFileCode, jsx: faFileCode, mjs: faFileCode, ts: faFileCode, tsx: faFileCode,
+  py: faFileCode, php: faFileCode, rb: faFileCode, java: faFileCode, c: faFileCode,
+  cpp: faFileCode, cc: faFileCode, h: faFileCode, hpp: faFileCode, go: faFileCode,
+  rs: faFileCode, swift: faFileCode, kt: faFileCode, sh: faFileCode, bash: faFileCode,
+  sql: faFileCode, json: faFileCode, html: faFileCode, htm: faFileCode, css: faFileCode,
+  scss: faFileCode, xml: faFileCode, yaml: faFileCode, yml: faFileCode, vue: faFileCode,
+  md: faFileCode, svelte: faFileCode, gitignore: faFileCode, dockerfile: faFileCode,
+  txt: faFileLines, log: faFileLines, text: faFileLines,
+};
 
 export interface BookmarkPosition {
   edge: BookmarkEdge;
@@ -48,9 +75,35 @@ export class FileBrowser {
   faFolder = faFolder;
   faFileImage = faFileImage;
 
+  fileIcon(entry: BrowserEntry): IconDefinition {
+    if (entry.kind === 'directory') {
+      return faFolder;
+    }
+    if (entry.isImage) {
+      return faFileImage;
+    }
+    const segments = entry.name.split('.');
+    const extension = segments.length > 1 ? (segments.pop() ?? '').toLowerCase() : '';
+    return FILE_ICON_BY_EXTENSION[extension] ?? faFile;
+  }
+
   readonly fileBrowser = inject(FileBrowserService);
   readonly bookmarks = input<BookmarkItem[]>([]);
   readonly permissionMap = input<Record<string, boolean>>({});
+  readonly openMedia = output<BrowserEntry>();
+
+  onItemClick(entry: BrowserEntry): void {
+    if (entry.kind === 'directory') {
+      return;
+    }
+    if (entry.isImage
+      || PLAYABLE_VIDEO.test(entry.name)
+      || PLAYABLE_AUDIO.test(entry.name)
+      || PLAYABLE_PDF.test(entry.name)
+      || isTextFileName(entry.name)) {
+      this.openMedia.emit(entry);
+    }
+  }
 
   bookmarkDenied(bookmark: BookmarkItem): boolean {
     return !!bookmark.treeUri && this.permissionMap()[bookmark.treeUri] === false;
@@ -78,6 +131,8 @@ export class FileBrowser {
   }
 
   readonly selectedBookmarkIndex = signal<Record<string, number>>({});
+
+  readonly moveProgress = signal<{ current: number; total: number } | null>(null);
 
   readonly statusSummary = computed(() => {
     const indexMap = this.selectedBookmarkIndex();
@@ -142,29 +197,36 @@ export class FileBrowser {
       return;
     }
 
-    if (Capacitor.isNativePlatform()) {
-      const failures: string[] = [];
-      await Promise.all(pairs.map(async ({ entry, bookmark }) => {
-        try {
-          await this.moveEntry(entry, bookmark);
-          this.fileBrowser.removeEntry(entry.path);
-          this.deselectEntry(entry.path);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          failures.push(`'${entry.name}' → '${bookmark.name}': ${message}`);
-          console.warn(failures[failures.length - 1]);
-        }
-      }));
-      if (failures.length > 0) {
-        window.alert(`No se pudieron mover ${failures.length} archivo(s):\n\n${failures.join('\n')}`);
-      }
-      return;
+    if (!Capacitor.isNativePlatform()) {
+      this.downloadMoveScript(pairs);
     }
 
-    this.downloadMoveScript(pairs);
-    for (const { entry } of pairs) {
-      this.fileBrowser.removeEntry(entry.path);
-      this.deselectEntry(entry.path);
+    const failures: string[] = [];
+    const total = pairs.length;
+    this.moveProgress.set({ current: 0, total });
+
+    for (const { entry, bookmark } of pairs) {
+      try {
+        if (Capacitor.isNativePlatform()) {
+          await this.moveEntry(entry, bookmark);
+        }
+        this.fileBrowser.removeEntry(entry.path);
+        this.deselectEntry(entry.path);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        failures.push(`'${entry.name}' → '${bookmark.name}': ${message}`);
+        console.warn(failures[failures.length - 1]);
+      }
+      this.moveProgress.update((progress) =>
+        progress ? { ...progress, current: progress.current + 1 } : progress,
+      );
+    }
+
+    this.moveProgress.set(null);
+    this.selectedBookmarkIndex.set({});
+
+    if (failures.length > 0) {
+      window.alert(`No se pudieron mover ${failures.length} archivo(s):\n\n${failures.join('\n')}`);
     }
   }
 

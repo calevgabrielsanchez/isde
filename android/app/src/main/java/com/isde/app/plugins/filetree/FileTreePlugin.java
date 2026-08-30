@@ -6,10 +6,16 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
+import android.graphics.Matrix;
+import android.graphics.Rect;
+import android.graphics.pdf.PdfRenderer;
 import android.net.Uri;
 import android.os.Build;
+import android.os.ParcelFileDescriptor;
 import android.provider.DocumentsContract;
 import android.util.Base64;
+import android.webkit.MimeTypeMap;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -21,9 +27,14 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 import androidx.activity.result.ActivityResult;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 
 @CapacitorPlugin(name = "FileTree")
 public class FileTreePlugin extends Plugin {
@@ -170,9 +181,10 @@ public class FileTreePlugin extends Plugin {
             call.reject("uri es requerido");
             return;
         }
+        int maxSize = call.getInt("max", 512);
         try {
             Uri uri = Uri.parse(uriString);
-            String dataUrl = loadThumbnail(uri);
+            String dataUrl = loadThumbnail(uri, maxSize);
             if (dataUrl == null) {
                 call.reject("No se pudo generar la miniatura");
                 return;
@@ -183,7 +195,7 @@ public class FileTreePlugin extends Plugin {
         }
     }
 
-    private String loadThumbnail(Uri uri) {
+    private String loadThumbnail(Uri uri, int maxSize) {
         ContentResolver resolver = getContext().getContentResolver();
         BitmapFactory.Options bounds = new BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;
@@ -196,7 +208,7 @@ public class FileTreePlugin extends Plugin {
             return null;
         }
         int sample = 1;
-        while (bounds.outWidth / sample > 192 || bounds.outHeight / sample > 192) {
+        while (bounds.outWidth / sample > maxSize || bounds.outHeight / sample > maxSize) {
             sample *= 2;
         }
         BitmapFactory.Options decode = new BitmapFactory.Options();
@@ -211,12 +223,231 @@ public class FileTreePlugin extends Plugin {
             return null;
         }
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        boolean ok = bitmap.compress(Bitmap.CompressFormat.JPEG, 60, out);
+        boolean ok = bitmap.compress(Bitmap.CompressFormat.JPEG, 75, out);
         bitmap.recycle();
         if (!ok) {
             return null;
         }
         return "data:image/jpeg;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
+    }
+
+    @PluginMethod
+    public void readText(PluginCall call) {
+        String uriString = call.getString("uri");
+        if (uriString == null || uriString.isEmpty()) {
+            call.reject("uri es requerido");
+            return;
+        }
+        try {
+            Uri uri = Uri.parse(uriString);
+            ContentResolver resolver = getContext().getContentResolver();
+            StringBuilder builder = new StringBuilder();
+            try (InputStream in = resolver.openInputStream(uri);
+                 BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                if (in == null) {
+                    call.reject("No se pudo abrir el archivo de texto");
+                    return;
+                }
+                String line;
+                boolean first = true;
+                while ((line = reader.readLine()) != null) {
+                    if (!first) {
+                        builder.append('\n');
+                    }
+                    builder.append(line);
+                    first = false;
+                }
+            }
+            call.resolve(new JSObject().put("text", builder.toString()));
+        } catch (Exception error) {
+            call.reject("No se pudo leer el archivo de texto: " + error.getMessage(), error);
+        }
+    }
+
+    @PluginMethod
+    public void pdfInfo(PluginCall call) {
+        String uriString = call.getString("uri");
+        if (uriString == null || uriString.isEmpty()) {
+            call.reject("uri es requerido");
+            return;
+        }
+        File cached = null;
+        ParcelFileDescriptor pfd = null;
+        PdfRenderer renderer = null;
+        try {
+            Uri uri = Uri.parse(uriString);
+            cached = cachePdfFile(uri);
+            pfd = ParcelFileDescriptor.open(cached, ParcelFileDescriptor.MODE_READ_ONLY);
+            renderer = new PdfRenderer(pfd);
+            call.resolve(new JSObject().put("count", renderer.getPageCount()));
+        } catch (Exception error) {
+            call.reject("No se pudo abrir el PDF: " + error.getMessage(), error);
+        } finally {
+            if (renderer != null) {
+                renderer.close();
+            }
+            if (pfd != null) {
+                try {
+                    pfd.close();
+                } catch (Exception ignored) {
+                }
+            }
+            if (cached != null) {
+                cached.delete();
+            }
+        }
+    }
+
+    @PluginMethod
+    public void pdfPage(PluginCall call) {
+        String uriString = call.getString("uri");
+        int pageIndex = call.getInt("page", 0);
+        int maxSize = call.getInt("max", 1440);
+        if (uriString == null || uriString.isEmpty()) {
+            call.reject("uri es requerido");
+            return;
+        }
+        File cached = null;
+        ParcelFileDescriptor pfd = null;
+        PdfRenderer renderer = null;
+        PdfRenderer.Page page = null;
+        try {
+            Uri uri = Uri.parse(uriString);
+            cached = cachePdfFile(uri);
+            pfd = ParcelFileDescriptor.open(cached, ParcelFileDescriptor.MODE_READ_ONLY);
+            renderer = new PdfRenderer(pfd);
+            if (pageIndex < 0 || pageIndex >= renderer.getPageCount()) {
+                call.reject("Página fuera de rango");
+                return;
+            }
+            page = renderer.openPage(pageIndex);
+            int pageWidth = page.getWidth();
+            int pageHeight = page.getHeight();
+            float scale = Math.min(1f, maxSize / (float) pageWidth);
+            if (scale < 0.01f) {
+                scale = 0.01f;
+            }
+            int bitmapWidth = Math.max(1, Math.round(pageWidth * scale));
+            int bitmapHeight = Math.max(1, Math.round(pageHeight * scale));
+            Bitmap bitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888);
+            bitmap.eraseColor(Color.WHITE);
+            Matrix matrix = new Matrix();
+            matrix.postScale(scale, scale);
+            page.render(bitmap, new Rect(0, 0, bitmapWidth, bitmapHeight), matrix, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            boolean ok = bitmap.compress(Bitmap.CompressFormat.JPEG, 75, out);
+            bitmap.recycle();
+            if (!ok) {
+                call.reject("No se pudo renderizar la página del PDF");
+                return;
+            }
+            call.resolve(new JSObject().put("data", "data:image/jpeg;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)));
+        } catch (Exception error) {
+            call.reject("No se pudo renderizar la página: " + error.getMessage(), error);
+        } finally {
+            if (page != null) {
+                page.close();
+            }
+            if (renderer != null) {
+                renderer.close();
+            }
+            if (pfd != null) {
+                try {
+                    pfd.close();
+                } catch (Exception ignored) {
+                }
+            }
+            if (cached != null) {
+                cached.delete();
+            }
+        }
+    }
+
+    private File cachePdfFile(Uri uri) throws java.io.IOException {
+        File cacheDir = getContext().getCacheDir();
+        cleanupReproductorCache(cacheDir);
+        File outFile = new File(cacheDir, "reproductor_" + System.currentTimeMillis() + ".pdf");
+        ContentResolver resolver = getContext().getContentResolver();
+        try (InputStream in = resolver.openInputStream(uri);
+             OutputStream out = new FileOutputStream(outFile)) {
+            if (in == null) {
+                throw new java.io.IOException("No se pudo abrir el PDF");
+            }
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = in.read(buffer)) > 0) {
+                out.write(buffer, 0, read);
+            }
+        }
+        return outFile;
+    }
+
+    @PluginMethod
+    public void prepareMedia(PluginCall call) {
+        String uriString = call.getString("uri");
+        if (uriString == null || uriString.isEmpty()) {
+            call.reject("uri es requerido");
+            return;
+        }
+        try {
+            Uri uri = Uri.parse(uriString);
+            ContentResolver resolver = getContext().getContentResolver();
+            String mime = resolver.getType(uri);
+            String extension = null;
+            if (mime != null) {
+                extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime);
+            }
+            if (extension == null) {
+                String lastSegment = uri.getLastPathSegment();
+                int dot = lastSegment != null ? lastSegment.lastIndexOf('.') : -1;
+                if (dot >= 0) {
+                    extension = lastSegment.substring(dot + 1);
+                }
+            }
+
+            File cacheDir = getContext().getCacheDir();
+            cleanupReproductorCache(cacheDir);
+
+            String fileName = "reproductor_" + System.currentTimeMillis()
+                + (extension != null && !extension.isEmpty() ? "." + extension : ".bin");
+            File outFile = new File(cacheDir, fileName);
+
+            try (InputStream in = resolver.openInputStream(uri);
+                 OutputStream out = new FileOutputStream(outFile)) {
+                if (in == null) {
+                    outFile.delete();
+                    call.reject("No se pudo abrir el archivo");
+                    return;
+                }
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = in.read(buffer)) > 0) {
+                    out.write(buffer, 0, read);
+                }
+            }
+
+            String localUrl = getBridge().getLocalUrl() + "/_capacitor_file_" + outFile.getAbsolutePath();
+            call.resolve(new JSObject().put("url", localUrl));
+        } catch (Exception error) {
+            call.reject("No se pudo preparar el medio: " + error.getMessage(), error);
+        }
+    }
+
+    private void cleanupReproductorCache(File cacheDir) {
+        try {
+            File[] files = cacheDir.listFiles();
+            if (files == null) {
+                return;
+            }
+            long cutoff = System.currentTimeMillis() - 24L * 60 * 60 * 1000;
+            for (File file : files) {
+                if (file.getName().startsWith("reproductor_") && file.lastModified() < cutoff) {
+                    file.delete();
+                }
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     @PluginMethod
@@ -292,6 +523,7 @@ public class FileTreePlugin extends Plugin {
             }
 
             copyTo(sourceUri, destDoc);
+            call.resolve();
         } catch (Exception error) {
             call.reject("No se pudo mover el archivo: " + error.getMessage(), error);
         }

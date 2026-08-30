@@ -63,10 +63,10 @@
 .icon-dropdown {
   position: absolute;
   top: calc(100% + 4px);
-   right: -72px;
+   right: -284px;
   z-index: 10;
   display: grid;
-  grid-template-columns: repeat(2, 48px);
+  grid-template-columns: repeat(6, 48px);
   gap: 4px;
   padding: 6px;
   background-color: var(--bg-header, #37373e);
@@ -281,6 +281,50 @@
   height: 40%;
   background-color: var(--bg-header, #37373e);
   border: 1px solid var(--border-color, #00558a);
+}
+
+/* --- Acceso total --- */
+.all-access-row {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0 10px 0;
+}
+
+.all-access-row .fa-icon {
+  color: var(--fontawesome-color, #cb00b0);
+}
+
+.btn-all-access {
+  width: 85%;
+  padding: 10px 16px;
+  background-color: var(--bg-header, #37373e);
+  color: var(--text-color, #00558a);
+  border: 2px solid var(--border-color, #00558a);
+  box-shadow: inset 0 0 0 2px var(--bg-app, #2c2c31), 0 4px 8px rgba(0, 0, 0, 0.3);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.1s, background-color 0.2s, color 0.2s;
+  text-align: center;
+}
+
+.btn-all-access:hover {
+  background-color: var(--border-color, #00558a);
+  color: var(--bg-app, #2c2c31);
+}
+
+.btn-all-access:active {
+  transform: translateY(2px);
+}
+
+.all-access-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #2ecc71;
+  font-size: 0.95rem;
+  font-weight: bold;
 }
 
 /* --- Botón Mover --- */

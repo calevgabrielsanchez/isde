@@ -1,0 +1,77 @@
+@if (entry(); as entry) {
+  <div class="reproductor-overlay" (click)="close.emit()">
+    <button class="reproductor-close" type="button" aria-label="Cerrar reproductor" (click)="close.emit()">
+      <fa-icon [icon]="faClose"></fa-icon>
+    </button>
+
+    <div class="reproductor-stage" (click)="$event.stopPropagation()">
+      @switch (mediaKind()) {
+        @case ('image') {
+          @if (mediaUrl(); as url) {
+            <img class="reproductor-media reproductor-image" [src]="url" alt="" />
+          } @else if (isLoading()) {
+            <fa-icon [icon]="faSpinner" class="reproductor-spinner reproductor-spin"></fa-icon>
+          }
+        }
+        @case ('video') {
+          @if (mediaUrl(); as url) {
+            <video class="reproductor-media" [src]="url" controls autoplay playsinline></video>
+          } @else if (isLoading()) {
+            <fa-icon [icon]="faSpinner" class="reproductor-spinner reproductor-spin"></fa-icon>
+          }
+        }
+        @case ('audio') {
+          <div class="reproductor-audio">
+            <fa-icon [icon]="faMusic" class="reproductor-audio-icon"></fa-icon>
+            @if (mediaUrl(); as url) {
+              <audio class="reproductor-audio-controls" [src]="url" controls autoplay></audio>
+            }
+          </div>
+        }
+        @case ('text') {
+          @if (textContent(); as text) {
+            <pre class="reproductor-text">{{ text }}</pre>
+          } @else if (isLoading()) {
+            <fa-icon [icon]="faSpinner" class="reproductor-spinner reproductor-spin"></fa-icon>
+          } @else {
+            <div class="reproductor-error">No se pudo leer este archivo de texto.</div>
+          }
+        }
+        @case ('pdf') {
+          @if (isNative && pdfPagerMode()) {
+            @if (pdfPageUrl(); as url) {
+              <img class="reproductor-media reproductor-image" [src]="url" alt="" />
+              <div class="reproductor-pdf-controls">
+                <button class="reproductor-pdf-btn" type="button" (click)="prevPdfPage()" [disabled]="pdfCurrentPage() <= 1">
+                  <fa-icon [icon]="faChevronLeft"></fa-icon> Anterior
+                </button>
+                <span class="reproductor-pdf-count">Página {{ pdfCurrentPage() }} de {{ pdfTotalPages() }}</span>
+                <button class="reproductor-pdf-btn" type="button" (click)="nextPdfPage()" [disabled]="pdfCurrentPage() >= pdfTotalPages()">
+                  Siguiente <fa-icon [icon]="faChevronRight"></fa-icon>
+                </button>
+              </div>
+            } @else if (pdfLoading()) {
+              <fa-icon [icon]="faSpinner" class="reproductor-spinner reproductor-spin"></fa-icon>
+            } @else if (isLoading()) {
+              <fa-icon [icon]="faSpinner" class="reproductor-spinner reproductor-spin"></fa-icon>
+            } @else {
+              <div class="reproductor-error">No se pudo abrir este PDF.{{ pdfError() ? ' ' + pdfError() : '' }}</div>
+            }
+          } @else {
+            @if (pdfFrameUrl(); as url) {
+              <iframe class="reproductor-pdf-frame" [src]="url" title="PDF"></iframe>
+            } @else if (isLoading() || pdfLoading()) {
+              <fa-icon [icon]="faSpinner" class="reproductor-spinner reproductor-spin"></fa-icon>
+            } @else {
+              <div class="reproductor-error">No se pudo abrir este PDF.{{ pdfError() ? ' ' + pdfError() : '' }}</div>
+            }
+          }
+        }
+        @default {
+          <div class="reproductor-error">No se puede reproducir este archivo.</div>
+        }
+      }
+      <span class="reproductor-title">{{ entry.name }}</span>
+    </div>
+  </div>
+}

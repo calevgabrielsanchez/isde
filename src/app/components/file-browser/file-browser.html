@@ -1,4 +1,12 @@
 <div class="file-browser">
+  @if (moveProgress(); as progress) {
+    <div class="fb-move-progress">
+      <div class="fb-move-progress-track">
+        <div class="fb-move-progress-fill" [style.width.%]="progress.current / progress.total * 100"></div>
+      </div>
+      <span class="fb-move-progress-label">Moviendo {{ progress.current }} de {{ progress.total }}...</span>
+    </div>
+  }
   @if (fileBrowser.loading()) {
     <div class="fb-status">Cargando archivos...</div>
   } @else if (fileBrowser.error()) {
@@ -20,18 +28,14 @@
               <fa-icon [icon]="slot.bookmark.icon" class="fa-icon"></fa-icon>
             </button>
           }
-          <div class="fb-thumb-zone">
+          <div class="fb-thumb-zone" (click)="onItemClick(entry)">
             @if (entry.isImage && entry.thumb) {
               <img class="fb-thumb" [src]="entry.thumb" alt="" loading="lazy" />
-            } @else if (entry.kind === 'directory') {
-              <fa-icon [icon]="faFolder" class="fb-icon fb-folder"></fa-icon>
-            } @else if (entry.isImage) {
-              <fa-icon [icon]="faFileImage" class="fb-icon"></fa-icon>
             } @else {
-              <fa-icon [icon]="faFile" class="fb-icon"></fa-icon>
+              <fa-icon [icon]="fileIcon(entry)" class="fb-icon" [ngClass]="{ 'fb-folder': entry.kind === 'directory' }"></fa-icon>
             }
           </div>
-          <span class="fb-name" [title]="entry.name">{{ entry.name }}</span>
+          <span class="fb-name" [title]="entry.name" (click)="onItemClick(entry)">{{ entry.name }}</span>
         </div>
       }
     </div>

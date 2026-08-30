@@ -18,10 +18,10 @@
     <!-- Área principal de contenido -->
     <main class="app-content">
         @if(isMenuOpen){
-          <app-menu [selectedPath]="selectedPath" [permissionMap]="permissionMap()" (folderSelected)="onFolderSelected($event)" (bookmarksChange)="onBookmarksChange($event)" (moveTriggered)="onMoveTriggered()"></app-menu>
+          <app-menu [selectedPath]="selectedPath" [permissionMap]="permissionMap()" [rootTreeUri]="rootTreeUri()" (folderSelected)="onFolderSelected($event)" (bookmarksChange)="onBookmarksChange($event)" (moveTriggered)="onMoveTriggered()" (grantAllAccess)="onGrantAllAccess()"></app-menu>
         }
         @if (fileBrowser.folderName() !== null || fileBrowser.loading() || fileBrowser.error()) {
-          <app-file-browser #fileBrowserRef [class.fb-hidden]="isMenuOpen" [bookmarks]="bookmarks" [permissionMap]="permissionMap()" (click)="onFileBrowserClick()"></app-file-browser>
+          <app-file-browser #fileBrowserRef [class.fb-hidden]="isMenuOpen" [bookmarks]="bookmarks" [permissionMap]="permissionMap()" (click)="onFileBrowserClick()" (openMedia)="onOpenMedia($event)"></app-file-browser>
         }
     </main>
 
@@ -41,4 +41,8 @@
       }
     </footer>
   </div>
+
+  @if (mediaEntry(); as entry) {
+    <app-reproductor [entry]="entry" (close)="onCloseMedia()"></app-reproductor>
+  }
 </div>

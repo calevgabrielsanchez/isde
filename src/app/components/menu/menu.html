@@ -81,6 +81,23 @@
 
   </div>
 
+  <!-- Acceso total -->
+  @if (isNative) {
+    <div class="all-access-row">
+      @if (allAccessGranted()) {
+        <span class="all-access-ok">
+          <fa-icon [icon]="faCheck" class="fa-icon"></fa-icon>
+          Acceso a todas las carpetas concedido
+        </span>
+      } @else {
+        <button class="btn-all-access" (click)="onGrantAllAccess()">
+          <fa-icon [icon]="faKey" class="fa-icon"></fa-icon>
+          Conceder acceso a todas las carpetas
+        </button>
+      }
+    </div>
+  }
+
   <!-- Botón Mover -->
   <div class="action-row">
     <button class="btn-mover" (click)="onMove()">

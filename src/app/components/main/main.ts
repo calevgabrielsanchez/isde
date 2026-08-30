@@ -1,21 +1,23 @@
-import { Component, inject, signal, ViewChild } from '@angular/core';
+import { Component, inject, OnInit, signal, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faBars, faSmile } from '@fortawesome/free-solid-svg-icons';
 import { Capacitor } from '@capacitor/core';
 import { Menu } from "../menu/menu";
 import { FileBrowser } from "../file-browser/file-browser";
-import { FileBrowserService } from "../../services/file-browser.service";
+import { FileBrowserService, type BrowserEntry } from "../../services/file-browser.service";
 import { FileTree } from "../../services/file-tree.plugin";
+import { Reproductor } from "../reproductor/reproductor";
 import type { BookmarkItem } from "../menu/menu";
 
 @Component({
-  imports: [CommonModule, FontAwesomeModule, Menu, FileBrowser],
+  imports: [CommonModule, FontAwesomeModule, Menu, FileBrowser, Reproductor],
   selector: 'app-main',
   styleUrl: './main.css',
   templateUrl: './main.html',
 })
-export class Main {
+export class Main implements OnInit {
+
   // Iconos de FontAwesome
   faBars = faBars;
   faSmile = faSmile;
@@ -49,6 +51,91 @@ export class Main {
 
   readonly permissionMap = signal<Record<string, boolean>>({});
 
+  readonly rootTreeUri = signal<string | undefined>(this.loadRootTreeUri());
+
+  ngOnInit(): void {
+    void this.checkPermissions(this.bookmarks);
+  }
+
+  private loadRootTreeUri(): string | undefined {
+    if (typeof document === 'undefined') {
+      return undefined;
+    }
+    const matches = document.cookie.match(/(?:^|;\s*)isdeRootTree=([^;]*)/);
+    if (!matches) {
+      return undefined;
+    }
+    try {
+      const parsed = JSON.parse(decodeURIComponent(matches[1])) as { treeUri?: string };
+      return typeof parsed.treeUri === 'string' ? parsed.treeUri : undefined;
+    } catch (error) {
+      console.warn('No se pudo cargar el acceso total desde la cookie:', error);
+      return undefined;
+    }
+  }
+
+  private saveRootTreeUri(treeUri: string | undefined): void {
+    if (typeof document === 'undefined') {
+      return;
+    }
+    const value = treeUri !== undefined ? encodeURIComponent(JSON.stringify({ treeUri })) : '';
+    document.cookie = `isdeRootTree=${value}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+  }
+
+  onGrantAllAccess(): void {
+    if (!Capacitor.isNativePlatform()) {
+      window.alert('El acceso total solo está disponible desde el dispositivo.');
+      return;
+    }
+    void FileTree.pickTree({ startDocumentUri: undefined })
+      .then((result) => {
+        this.setRootTreeUri(result.treeUri);
+      })
+      .catch((error) => {
+        if (!(error instanceof Error) || error.message !== 'pickDirectory canceled.') {
+          console.error('Error al pedir acceso total:', error);
+        }
+      });
+  }
+
+  setRootTreeUri(treeUri: string): void {
+    this.rootTreeUri.set(treeUri);
+    this.saveRootTreeUri(treeUri);
+    void this.checkPermissions(this.bookmarks);
+  }
+
+  private treeUnderRoot(uri: string): boolean {
+    const root = this.rootTreeUri();
+    if (!root) {
+      return false;
+    }
+    const rootId = this.treeIdSegments(root);
+    const uriId = this.treeIdSegments(uri);
+    if (rootId.length === 0 || uriId.length < rootId.length) {
+      return false;
+    }
+    for (let i = 0; i < rootId.length; i++) {
+      if (rootId[i] !== uriId[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private treeIdSegments(uri: string): string[] {
+    const match = uri.match(/\/tree\/([^/]+)$/);
+    if (!match) {
+      return [];
+    }
+    let treeId: string;
+    try {
+      treeId = decodeURIComponent(match[1]);
+    } catch {
+      treeId = match[1];
+    }
+    return treeId.split('/').filter((segment) => segment.length > 0);
+  }
+
   private async checkPermissions(items: BookmarkItem[]): Promise<void> {
     if (!Capacitor.isNativePlatform()) {
       return;
@@ -57,6 +144,10 @@ export class Main {
     const next = { ...this.permissionMap() };
     await Promise.all(
       treeUris.map(async (uri) => {
+        if (this.treeUnderRoot(uri)) {
+          next[uri] = true;
+          return;
+        }
         try {
           const result = await FileTree.check({ treeUri: uri });
           next[uri] = result.ok;
@@ -86,8 +177,18 @@ export class Main {
     this.refreshStatus();
   }
 
-  onMoveTriggered(): void {
-    void this.fileBrowserRef?.moveSelectedToBookmarks();
+  readonly mediaEntry = signal<BrowserEntry | null>(null);
+
+  onOpenMedia(entry: BrowserEntry): void {
+    this.mediaEntry.set(entry);
+  }
+
+  onCloseMedia(): void {
+    this.mediaEntry.set(null);
+  }
+
+  async onMoveTriggered(): Promise<void> {
+    await this.fileBrowserRef?.moveSelectedToBookmarks();
     this.refreshStatus();
   }
 }
