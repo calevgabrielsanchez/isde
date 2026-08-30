@@ -28,7 +28,10 @@ ng generate --help
 
 ## Building
 
-To build the project run:
+To build the project run:## Compilar a capacitor y subir ak celular
+ng build --configuration production
+npx cap sync android
+npx cap copy android && export ANDROID_HOME=$HOME/Android/Sdk && export ANDROID_SDK_ROOT=$HOME/Android/Sdk && npx cap run android
 
 ```bash
 ng build
@@ -57,3 +60,11 @@ Angular CLI does not come with an end-to-end testing framework by default. You c
 ## Additional Resources
 
 For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+
+## Compilar a capacitor y subir ak celular
+ng build --configuration production
+npx cap sync android
+npx cap copy android && export ANDROID_HOME=$HOME/Android/Sdk && export ANDROID_SDK_ROOT=$HOME/Android/Sdk && npx cap run android
+
+ng build --configuration production && npx cap sync android && npx cap copy android && export ANDROID_HOME=$HOME/Android/Sdk && export ANDROID_SDK_ROOT=$HOME/Android/Sdk && npx cap run android
+

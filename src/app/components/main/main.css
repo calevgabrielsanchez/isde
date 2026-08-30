@@ -6,6 +6,7 @@
   --border-color: #00558a;
   --text-color: #62c0f4;
   --fontawesome-color: #cb00b0;
+  --selected-color: #44e233;
   
   display: block;
   width: 100vw;
@@ -108,4 +109,70 @@
   flex: 1;
   background-color: var(--bg-app);
   overflow-y: auto;
+}
+
+/* Mantiene el navegador vivo al abrir el menú para conservar selecciones */
+app-file-browser.fb-hidden {
+  display: none !important;
+}
+
+/* --- Barra de estado inferior --- */
+.app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 12px;
+  background-color: var(--bg-header);
+  border-top: 2px solid var(--border-color);
+  color: var(--text-color);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 0.85rem;
+}
+
+.app-footer-active {
+  border-top-color: var(--selected-color);
+  overflow: auto;
+}
+
+.app-footer-count {
+  font-weight: 600;
+}
+
+.app-footer-target {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border: 1px solid var(--selected-color);
+  border-radius: 12px;
+}
+
+.app-footer-target-denied {
+  border-color: #ff5b5b;
+  color: #ff5b5b;
+  background-color: rgba(120, 10, 10, 0.5);
+}
+
+.app-footer-icon {
+  color: var(--selected-color);
+  font-size: 0.9rem;
+}
+
+.app-footer-name {
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-footer-n {
+  opacity: 0.7;
+}
+
+.app-footer-hint {
+  opacity: 0.8;
+  font-size: 0.8rem;
 }

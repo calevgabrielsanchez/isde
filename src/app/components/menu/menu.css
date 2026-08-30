@@ -51,6 +51,53 @@
   opacity: 0.85;
 }
 
+.icon-select {
+  position: relative;
+}
+
+.icon-select-trigger {
+  width: 48px;
+  height: 48px;
+}
+
+.icon-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+   right: -72px;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(2, 48px);
+  gap: 4px;
+  padding: 6px;
+  background-color: var(--bg-header, #37373e);
+  border: 2px solid var(--border-color, #00558a);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.45);
+}
+
+.icon-option {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-app, #2c2c31);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.icon-option:hover {
+  background-color: rgba(0, 85, 138, 0.15);
+}
+
+.icon-option.selected {
+  border-color: var(--fontawesome-color, #cb00b0);
+}
+
+.icon-option .item-icon {
+  font-size: 1.3rem;
+}
+
 /* --- Marcadores Section --- */
 .marcadores-section {
   display: flex;
@@ -109,9 +156,83 @@
 }
 
 .bookmark-item.selected {
-  background-color: rgba(0, 85, 138, 0.3);
-  border: 1px solid var(--border-color, #00558a);
+  background-color: rgba(68, 226, 51, 0.15);
+  border: 1px solid var(--selected-color, hsl(203, 100%, 50%));
   font-weight: bold;
+}
+
+.bookmark-item.selected>* {
+ color: var(--selected-color);
+}
+
+.bookmark-item-denied {
+  background-color: rgba(120, 10, 10, 0.5);
+  border: 1px solid #ff5b5b;
+}
+
+.bookmark-item-denied>* {
+  color: #ff5b5b;
+}
+
+.bookmark-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bookmark-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bookmark-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.bookmark-action-btn:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.bookmark-action-btn .item-icon {
+  font-size: 0.85rem;
+}
+
+.bookmark-perm-btn {
+  color: var(--text-color, #00558a);
+}
+
+.bookmark-perm-btn-denied {
+  color: #ff5b5b;
+  animation: bookmark-perm-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes bookmark-perm-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.bookmark-del-btn {
+  color: #ff5b5b;
+}
+
+.bookmark-del-btn:hover {
+  background-color: rgba(255, 91, 91, 0.18);
 }
 
 .item-icon {

@@ -1,0 +1,43 @@
+<div class="file-browser">
+  @if (fileBrowser.loading()) {
+    <div class="fb-status">Cargando archivos...</div>
+  } @else if (fileBrowser.error()) {
+    <div class="fb-status fb-error">{{ fileBrowser.error() }}</div>
+  } @else if (fileBrowser.entries().length > 0) {
+    <div class="fb-grid">
+      @for (entry of fileBrowser.entries(); track entry.path) {
+        <div class="fb-item" [class.fb-directory]="entry.kind === 'directory'">
+          @for (slot of bookmarkSlots(); track $index) {
+            <button
+              type="button"
+              class="fb-bookmark fb-bookmark-{{ slot.position.edge }}"
+              [class.fb-bookmark-selected]="isBookmarkSelected(entry.path, $index)"
+              [class.fb-bookmark-denied]="bookmarkDenied(slot.bookmark)"
+              [ngStyle]="bookmarkStyle(slot.position)"
+              [attr.title]="bookmarkDenied(slot.bookmark) ? slot.bookmark.name + ' (sin permiso)' : slot.bookmark.name"
+              [attr.aria-label]="slot.bookmark.name"
+              (click)="onFileBrowserClick(entry.path, $index)">
+              <fa-icon [icon]="slot.bookmark.icon" class="fa-icon"></fa-icon>
+            </button>
+          }
+          <div class="fb-thumb-zone">
+            @if (entry.isImage && entry.thumb) {
+              <img class="fb-thumb" [src]="entry.thumb" alt="" loading="lazy" />
+            } @else if (entry.kind === 'directory') {
+              <fa-icon [icon]="faFolder" class="fb-icon fb-folder"></fa-icon>
+            } @else if (entry.isImage) {
+              <fa-icon [icon]="faFileImage" class="fb-icon"></fa-icon>
+            } @else {
+              <fa-icon [icon]="faFile" class="fb-icon"></fa-icon>
+            }
+          </div>
+          <span class="fb-name" [title]="entry.name">{{ entry.name }}</span>
+        </div>
+      }
+    </div>
+  } @else if (fileBrowser.folderName() !== null) {
+    <div class="fb-status">La carpeta está vacía.</div>
+  } @else {
+    <div class="fb-status">Abre una carpeta para ver su contenido.</div>
+  }
+</div>

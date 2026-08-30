@@ -18,8 +18,27 @@
     <!-- Área principal de contenido -->
     <main class="app-content">
         @if(isMenuOpen){
-          <app-menu></app-menu>
+          <app-menu [selectedPath]="selectedPath" [permissionMap]="permissionMap()" (folderSelected)="onFolderSelected($event)" (bookmarksChange)="onBookmarksChange($event)" (moveTriggered)="onMoveTriggered()"></app-menu>
+        }
+        @if (fileBrowser.folderName() !== null || fileBrowser.loading() || fileBrowser.error()) {
+          <app-file-browser #fileBrowserRef [class.fb-hidden]="isMenuOpen" [bookmarks]="bookmarks" [permissionMap]="permissionMap()" (click)="onFileBrowserClick()"></app-file-browser>
         }
     </main>
+
+    <!-- Barra de estado inferior -->
+    <footer class="app-footer" [class.app-footer-active]="statusInfo.total > 0">
+      @if (statusInfo.total > 0) {
+        <span class="app-footer-count">{{ statusInfo.total }} archivo(s) → mover a:</span>
+        @for (target of statusInfo.targets; track $index) {
+          <span class="app-footer-target" [class.app-footer-target-denied]="bookmarkDenied(target.bookmark)">
+            <fa-icon [icon]="target.bookmark.icon" class="app-footer-icon"></fa-icon>
+            <span class="app-footer-name">{{ target.bookmark.name }}</span>
+            <span class="app-footer-n">({{ target.count }})</span>
+          </span>
+        }
+      } @else {
+        <span class="app-footer-hint">Toca el marcador en un archivo para elegir su destino.</span>
+      }
+    </footer>
   </div>
 </div>

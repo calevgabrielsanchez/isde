@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">isDe</string>
+    <string name="title_activity_main">isDe</string>
+    <string name="package_name">com.isde.app</string>
+    <string name="custom_url_scheme">com.isde.app</string>
+</resources>

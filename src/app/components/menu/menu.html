@@ -2,9 +2,9 @@
   <!-- Campo Path y botón -->
   <div class="path-row">
     <div class="path-box">
-      <span class="path-text">{{ currentPath }}</span>
+      <span class="path-text">{{ selectedPath() }}</span>
     </div>
-    <button class="path-action-btn" aria-label="Abrir carpeta">
+    <button class="path-action-btn" aria-label="Abrir carpeta" (click)="onOpenFolder()">
       <fa-icon [icon]="faFolderOpen" class="fa-icon"></fa-icon>
     </button>
   </div>
@@ -15,17 +15,70 @@
     
     <div class="list-container">
       <div class="list-content">
-        @for (item of bookmarks(); track item; let i = $index) {
+        @for (item of bookmarks(); track item.name; let i = $index) {
           <div 
             class="bookmark-item"
             [class.selected]="i === selectedBookmarkIndex()"
+            [class.bookmark-item-denied]="bookmarkDenied(item)"
             (click)="selectBookmark(i)">
-            <fa-icon [icon]="faBookmark" class="item-icon"></fa-icon>
-            <span>{{ item }}</span>
+            <fa-icon [icon]="item.icon" class="item-icon"></fa-icon>
+            <span class="bookmark-name">{{ item.name }}</span>
+            <span class="bookmark-actions">
+              @if (isNative) {
+                <button
+                  type="button"
+                  class="bookmark-action-btn bookmark-perm-btn"
+                  [class.bookmark-perm-btn-denied]="bookmarkDenied(item)"
+                  [attr.title]="bookmarkDenied(item) ? 'Sin permiso. Toca para pedirlo de nuevo.' : 'Pedir permiso para mover archivos'"
+                  aria-label="Pedir permiso"
+                  (click)="$event.stopPropagation(); requestBookmarkPermission(i)">
+                  <fa-icon [icon]="faKey" class="item-icon"></fa-icon>
+                </button>
+              }
+              <button
+                type="button"
+                class="bookmark-action-btn bookmark-del-btn"
+                title="Eliminar marcador"
+                aria-label="Eliminar marcador"
+                (click)="$event.stopPropagation(); deleteBookmark(i)">
+                <fa-icon [icon]="faTrash" class="item-icon"></fa-icon>
+              </button>
+            </span>
           </div>
         }
       </div>
     </div>
+
+<!-- Campo Path y botón -->
+  <div class="path-row">
+
+    <div class="icon-select">
+      <button class="path-action-btn icon-select-trigger" aria-label="Icono de marcador" (click)="toggleIconDropdown()">
+        <fa-icon [icon]="selectedBookmarkIcon()" class="fa-icon"></fa-icon>
+      </button>
+      @if (iconDropdownOpen()) {
+        <div class="icon-dropdown">
+          @for (icon of bookmarkIconOptions; track icon.label; let i = $index) {
+            <button class="icon-option" [class.selected]="i === selectedBookmarkIconIndex()" (click)="selectBookmarkIcon(i)" aria-label="{{ icon.label }}">
+              <fa-icon [icon]="icon.icon" class="item-icon"></fa-icon>
+            </button>
+          }
+        </div>
+      }
+    </div>
+    
+    <div class="path-box">
+      <span class="path-text">{{ selectedPathAddBookMark() }}</span>
+    </div>
+    <button class="path-action-btn" aria-label="Abrir carpeta" (click)="onOpenFolderAddBookMark()">
+      <fa-icon [icon]="faFolderOpen" class="fa-icon"></fa-icon>
+    </button>
+<button class="path-action-btn" [attr.aria-label]="editingBookmark() ? 'Editar marcador' : 'Guardar marcador'" (click)="onGuardarMarcador()">
+      <fa-icon [icon]="addBookmarkIcon()" class="fa-icon"></fa-icon>
+    </button>
+    
+  </div>
+
   </div>
 
   <!-- Botón Mover -->
