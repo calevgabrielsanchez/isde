@@ -18,6 +18,7 @@ faSkull, faSkullCrossbones, faScrewdriverWrench
 } from '@fortawesome/free-solid-svg-icons';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import { Capacitor } from '@capacitor/core';
+import { Preferences } from '@capacitor/preferences';
 import { FilePicker } from '@capawesome/capacitor-file-picker';
 import { Filesystem } from '@capacitor/filesystem';
 import { FileTree } from '../../services/file-tree.plugin';
@@ -25,16 +26,8 @@ import { BrowserEntry, FileBrowserService, MAX_FILES } from '../../services/file
 
 const IMAGE_EXTENSION = /\.(jpe?g|png|gif|bmp|webp|svg|avif|ico)$/i;
 const BOOKMARKS_COOKIE = 'isdeBookmarks';
+const BOOKMARKS_PREFERENCE = 'isdeBookmarks';
 const BOOKMARKS_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
-
-const BOOKMARK_ICONS: IconDefinition[] = [
-  faBookmark, faHeart, faStar, faDownload, faImage, faMusic, faVideo,
-  faFolder, faCamera, faCode, faCircle, faSquare, faCube, faSeptagon,
-  faPentagon, faOctagon, faHexagon, faShapes,
-];
-const ICON_BY_NAME: Record<string, IconDefinition> = Object.fromEntries(
-  BOOKMARK_ICONS.map((icon) => [icon.iconName, icon]),
-);
 
 export interface BookmarkIconOption {
   label: string;
@@ -65,7 +58,14 @@ export interface BookmarkItem {
 export class Menu implements OnInit {
 
   ngOnInit(): void {
-    this.bookmarksChange.emit(this.bookmarks());
+    if (this.isNative) {
+      void this.loadBookmarksFromPreferences().then((items) => {
+        this.bookmarks.set(items);
+        this.bookmarksChange.emit(this.bookmarks());
+      });
+    } else {
+      this.bookmarksChange.emit(this.bookmarks());
+    }
   }
 
   faFolderOpen = faFolderOpen;
@@ -243,7 +243,7 @@ export class Menu implements OnInit {
         { name, path, icon, treeUri: pending.treeUri, treePath: pending.treePath },
       ]);
     }
-    this.saveBookmarksToCookie(this.bookmarks());
+    this.saveBookmarks(this.bookmarks());
     this.bookmarksChange.emit(this.bookmarks());
     this.selectedPathAddBookMark.set('');
     this.pendingBookmarkTree.set({});
@@ -267,7 +267,9 @@ export class Menu implements OnInit {
         .map((item) => ({
           name: item.name,
           path: item.path,
-          icon: typeof item.icon === 'string' ? (ICON_BY_NAME[item.icon] ?? faBookmark) : faBookmark,
+          icon: typeof item.icon === 'string'
+            ? (this.bookmarkIconOptions.find((option) => option.icon.iconName === item.icon)?.icon ?? faBookmark)
+            : faBookmark,
           treeUri: typeof item.treeUri === 'string' ? item.treeUri : undefined,
           treePath: typeof item.treePath === 'string' ? item.treePath : undefined,
         }));
@@ -277,18 +279,63 @@ export class Menu implements OnInit {
     }
   }
 
-  private saveBookmarksToCookie(items: BookmarkItem[]): void {
-    if (typeof document === 'undefined') {
-      return;
-    }
-    const serialized = items.map(({ name, path, icon, treeUri, treePath }) => ({
+  private serializedBookmarks(items: BookmarkItem[]): Record<string, string | undefined>[] {
+    return items.map(({ name, path, icon, treeUri, treePath }) => ({
       name,
       path,
       icon: icon.iconName,
       ...(treeUri !== undefined ? { treeUri } : {}),
       ...(treePath !== undefined ? { treePath } : {}),
     }));
-    document.cookie = `${BOOKMARKS_COOKIE}=${encodeURIComponent(JSON.stringify(serialized))}; path=/; max-age=${BOOKMARKS_COOKIE_MAX_AGE}; SameSite=Lax`;
+  }
+
+  private async saveBookmarksToPreferences(items: BookmarkItem[]): Promise<void> {
+    await Preferences.set({
+      key: BOOKMARKS_PREFERENCE,
+      value: JSON.stringify(this.serializedBookmarks(items)),
+    });
+  }
+
+  private async loadBookmarksFromPreferences(): Promise<BookmarkItem[]> {
+    const { value } = await Preferences.get({ key: BOOKMARKS_PREFERENCE });
+    if (value === null || value === undefined) {
+      return [];
+    }
+    try {
+      const parsed = JSON.parse(value);
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+      return parsed
+        .filter((item) => typeof item?.name === 'string' && typeof item?.path === 'string')
+        .map((item) => ({
+          name: item.name,
+          path: item.path,
+          icon: typeof item.icon === 'string'
+            ? (this.bookmarkIconOptions.find((option) => option.icon.iconName === item.icon)?.icon ?? faBookmark)
+            : faBookmark,
+          treeUri: typeof item.treeUri === 'string' ? item.treeUri : undefined,
+          treePath: typeof item.treePath === 'string' ? item.treePath : undefined,
+        }));
+    } catch (error) {
+      console.warn('No se pudieron cargar los marcadores desde Preferences:', error);
+      return [];
+    }
+  }
+
+  private saveBookmarksToCookie(items: BookmarkItem[]): void {
+    if (typeof document === 'undefined') {
+      return;
+    }
+    document.cookie = `${BOOKMARKS_COOKIE}=${encodeURIComponent(JSON.stringify(this.serializedBookmarks(items)))}; path=/; max-age=${BOOKMARKS_COOKIE_MAX_AGE}; SameSite=Lax`;
+  }
+
+  private saveBookmarks(items: BookmarkItem[]): void {
+    if (this.isNative) {
+      void this.saveBookmarksToPreferences(items);
+    } else {
+      this.saveBookmarksToCookie(items);
+    }
   }
 
   onOpenFolderAddBookMark(): void {
@@ -350,7 +397,7 @@ export class Menu implements OnInit {
           : item,
       ),
     );
-    this.saveBookmarksToCookie(this.bookmarks());
+    this.saveBookmarks(this.bookmarks());
     this.bookmarksChange.emit(this.bookmarks());
     if (this.selectedBookmarkIndex() === index) {
       this.selectedPathAddBookMark.set(folder.path);
@@ -370,7 +417,7 @@ export class Menu implements OnInit {
     }
     this.selectedBookmarkIndex.set(selected);
     this.editingBookmark.set(count > 0);
-    this.saveBookmarksToCookie(this.bookmarks());
+    this.saveBookmarks(this.bookmarks());
     this.bookmarksChange.emit(this.bookmarks());
     const bookmark = this.bookmarks()[selected];
     if (bookmark) {

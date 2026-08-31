@@ -88,6 +88,9 @@ export class FileBrowser {
   }
 
   readonly fileBrowser = inject(FileBrowserService);
+  readonly visibleEntries = computed(() =>
+    this.fileBrowser.entries().filter((entry) => entry.kind !== 'directory'),
+  );
   readonly bookmarks = input<BookmarkItem[]>([]);
   readonly permissionMap = input<Record<string, boolean>>({});
   readonly openMedia = output<BrowserEntry>();

@@ -21,8 +21,9 @@
   background-color: var(--bg-header, #37373e);
   border: 2px solid var(--border-color, #00558a);
   padding: 10px 14px;
-  display: flex;
-  align-items: center;
+display: flex;
+    justify-content: flex-end;
+    overflow: hidden;
 }
 
 .path-text {
@@ -33,6 +34,8 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  direction: rtl; 
+    text-align: left;
 }
 
 .path-action-btn {
@@ -161,7 +164,7 @@
   font-weight: bold;
 }
 
-.bookmark-item.selected>* {
+.bookmark-item.selected>span.bookmark-name {
  color: var(--selected-color);
 }
 

@@ -11,9 +11,9 @@
     <div class="fb-status">Cargando archivos...</div>
   } @else if (fileBrowser.error()) {
     <div class="fb-status fb-error">{{ fileBrowser.error() }}</div>
-  } @else if (fileBrowser.entries().length > 0) {
+  } @else if (visibleEntries().length > 0) {
     <div class="fb-grid">
-      @for (entry of fileBrowser.entries(); track entry.path) {
+      @for (entry of visibleEntries(); track entry.path) {
         <div class="fb-item" [class.fb-directory]="entry.kind === 'directory'">
           @for (slot of bookmarkSlots(); track $index) {
             <button

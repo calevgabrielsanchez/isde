@@ -116,6 +116,11 @@ app-file-browser.fb-hidden {
   display: none !important;
 }
 
+/* Mantiene el menú vivo al cerrarlo para no perder los marcadores */
+app-menu.menu-hidden {
+  display: none !important;
+}
+
 /* --- Barra de estado inferior --- */
 .app-footer {
   display: flex;
