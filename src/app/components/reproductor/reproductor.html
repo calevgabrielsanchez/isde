@@ -71,7 +71,36 @@
           <div class="reproductor-error">No se puede reproducir este archivo.</div>
         }
       }
-      <span class="reproductor-title">{{ entry.name }}</span>
+      <div class="reproductor-title-row">
+        @if (isRenaming()) {
+          <input
+            class="reproductor-rename-input"
+            [value]="renameText()"
+            (input)="renameText.set($any($event.target).value)"
+            (keydown.enter)="saveRename()"
+            (keydown.escape)="cancelRename()"
+            aria-label="Nuevo nombre sin extensión"
+          />
+          @if (isSavingRename()) {
+            <fa-icon [icon]="faSaveSpinner" class="reproductor-rename-spinner reproductor-spin"></fa-icon>
+          } @else {
+            <button class="reproductor-rename-btn" type="button" aria-label="Guardar nombre" (click)="saveRename()">
+              <fa-icon [icon]="faCheck"></fa-icon>
+            </button>
+            <button class="reproductor-rename-btn" type="button" aria-label="Cancelar" (click)="cancelRename()">
+              <fa-icon [icon]="faXmark"></fa-icon>
+            </button>
+          }
+        } @else {
+          <span class="reproductor-title">{{ entry.name }}</span>
+          <button class="reproductor-rename-icon" type="button" aria-label="Renombrar archivo" (click)="startRename()">
+            <fa-icon [icon]="faPen"></fa-icon>
+          </button>
+        }
+      </div>
+      @if (renameError(); as error) {
+        <div class="reproductor-rename-error">{{ error }}</div>
+      }
     </div>
   </div>
 }

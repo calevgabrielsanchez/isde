@@ -92,8 +92,15 @@ export class FileBrowser {
     this.fileBrowser.entries().filter((entry) => entry.kind !== 'directory'),
   );
   readonly bookmarks = input<BookmarkItem[]>([]);
+  readonly bookmarksByProfile = input<Record<string, BookmarkItem[]>>({});
+  readonly activeProfileId = input<string>('');
   readonly permissionMap = input<Record<string, boolean>>({});
   readonly openMedia = output<BrowserEntry>();
+
+  // Marcadores del perfil actualmente visible en la UI
+  readonly activeProfileBookmarks = computed(
+    () => this.bookmarksByProfile()[this.activeProfileId()] ?? this.bookmarks(),
+  );
 
   onItemClick(entry: BrowserEntry): void {
     if (entry.kind === 'directory') {
@@ -113,7 +120,7 @@ export class FileBrowser {
   }
 
   readonly bookmarkSlots = computed(() => {
-    const items = this.bookmarks();
+    const items = this.activeProfileBookmarks();
     return bookmarkPositions(items.length).map((position, index) => ({
       position,
       bookmark: items[index],
@@ -133,28 +140,31 @@ export class FileBrowser {
     }
   }
 
-  readonly selectedBookmarkIndex = signal<Record<string, number>>({});
+  // Selección por archivo: cada archivo recuerda el marcador de destino con su PERFIL
+  // (profileId + index), de modo que las marcas de distintos perfiles se mantienen.
+  readonly selectedBookmark = signal<Record<string, { profileId: string; index: number }>>({});
 
   readonly moveProgress = signal<{ current: number; total: number } | null>(null);
 
   readonly statusSummary = computed(() => {
-    const indexMap = this.selectedBookmarkIndex();
-    const bookmarks = this.bookmarks();
+    const selections = this.selectedBookmark();
+    const byProfile = this.bookmarksByProfile();
     const entriesByPath = new Map(this.fileBrowser.entries().map((entry) => [entry.path, entry]));
-    const targets = new Map<number, { bookmark: BookmarkItem; count: number }>();
+    const targets = new Map<string, { bookmark: BookmarkItem; count: number }>();
     let total = 0;
-    for (const [entryPath, slotIndex] of Object.entries(indexMap)) {
+    for (const [entryPath, sel] of Object.entries(selections)) {
       const entry = entriesByPath.get(entryPath);
       if (!entry) {
         continue;
       }
-      const bookmark = bookmarks[slotIndex];
+      const bookmark = byProfile[sel.profileId]?.[sel.index];
       if (!bookmark) {
         continue;
       }
       total++;
-      const current = targets.get(slotIndex);
-      targets.set(slotIndex, {
+      const key = `${sel.profileId}:${sel.index}`;
+      const current = targets.get(key);
+      targets.set(key, {
         bookmark,
         count: (current?.count ?? 0) + 1,
       });
@@ -163,37 +173,53 @@ export class FileBrowser {
   });
 
   selectBookmarkForEntry(entryPath: string, slotIndex: number): void {
-    this.selectedBookmarkIndex.update((current) => ({ ...current, [entryPath]: slotIndex }));
+    const profileId = this.activeProfileId();
+    this.selectedBookmark.update((current) => ({
+      ...current,
+      [entryPath]: { profileId, index: slotIndex },
+    }));
   }
 
   onFileBrowserClick(entryPath: string, slotIndex: number): void {
-    const bookmark = this.bookmarks()[slotIndex];
+    const bookmark = this.activeProfileBookmarks()[slotIndex];
     if (bookmark && this.bookmarkDenied(bookmark)) {
       window.alert(
         `El marcador '${bookmark.name}' no tiene permiso para mover archivos. Bórralo y créalo de nuevo desde el dispositivo.`,
       );
       return;
     }
-    this.selectedBookmarkIndex.update((current) => {
-      if (current[entryPath] === slotIndex) {
+    const profileId = this.activeProfileId();
+    this.selectedBookmark.update((current) => {
+      const existing = current[entryPath];
+      if (existing && existing.profileId === profileId && existing.index === slotIndex) {
         const next = { ...current };
         delete next[entryPath];
         return next;
       }
-      return { ...current, [entryPath]: slotIndex };
+      return { ...current, [entryPath]: { profileId, index: slotIndex } };
     });
   }
 
   isBookmarkSelected(entryPath: string, slotIndex: number): boolean {
-    return this.selectedBookmarkIndex()[entryPath] === slotIndex;
+    const sel = this.selectedBookmark()[entryPath];
+    return !!sel && sel.profileId === this.activeProfileId() && sel.index === slotIndex;
+  }
+
+  private bookmarkForSelection(sel: { profileId: string; index: number }): BookmarkItem | undefined {
+    return this.bookmarksByProfile()[sel.profileId]?.[sel.index];
   }
 
   async moveSelectedToBookmarks(): Promise<void> {
-    const bookmarks = this.bookmarks();
-    const indexMap = this.selectedBookmarkIndex();
+    const selections = this.selectedBookmark();
     const pairs = this.fileBrowser.entries()
-      .map((entry) => ({ entry, bookmark: bookmarks[indexMap[entry.path]] }))
-      .filter(({ entry, bookmark }) => bookmark !== undefined);
+      .map((entry) => {
+        const sel = selections[entry.path];
+        const bookmark = sel ? this.bookmarkForSelection(sel) : undefined;
+        return { entry, bookmark };
+      })
+      .filter(
+        (p): p is { entry: BrowserEntry; bookmark: BookmarkItem } => p.bookmark !== undefined,
+      );
 
     if (pairs.length === 0) {
       console.warn('Selecciona al menos un marcador en un archivo para moverlo.');
@@ -226,7 +252,7 @@ export class FileBrowser {
     }
 
     this.moveProgress.set(null);
-    this.selectedBookmarkIndex.set({});
+    this.selectedBookmark.set({});
 
     if (failures.length > 0) {
       window.alert(`No se pudieron mover ${failures.length} archivo(s):\n\n${failures.join('\n')}`);
@@ -365,7 +391,7 @@ export class FileBrowser {
   }
 
   private deselectEntry(entryPath: string): void {
-    this.selectedBookmarkIndex.update((current) => {
+    this.selectedBookmark.update((current) => {
       if (!(entryPath in current)) {
         return current;
       }

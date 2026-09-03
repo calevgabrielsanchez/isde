@@ -1,14 +1,16 @@
 import { Component, inject, OnInit, signal, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faBars, faSmile } from '@fortawesome/free-solid-svg-icons';
+import { faBars, faSmile, faFolderOpen, faDragon, faGlobe } from '@fortawesome/free-solid-svg-icons';
 import { Capacitor } from '@capacitor/core';
+import { Preferences } from '@capacitor/preferences';
 import { Menu } from "../menu/menu";
 import { FileBrowser } from "../file-browser/file-browser";
 import { FileBrowserService, type BrowserEntry } from "../../services/file-browser.service";
 import { FileTree } from "../../services/file-tree.plugin";
 import { Reproductor } from "../reproductor/reproductor";
 import type { BookmarkItem } from "../menu/menu";
+import { resolveBookmarkIcon } from "../menu/menu";
 
 @Component({
   imports: [CommonModule, FontAwesomeModule, Menu, FileBrowser, Reproductor],
@@ -21,15 +23,183 @@ export class Main implements OnInit {
   // Iconos de FontAwesome
   faBars = faBars;
   faSmile = faSmile;
+  faFolderOpen = faFolderOpen;
+  faDragon = faDragon;
+  faGlobe = faGlobe;
+
+  // Modos del botón de perfil (ciclo al hacer clic)
+  profileModes = [
+    { id: 'archivos', icon: faFolderOpen, label: 'Archivos' },
+    { id: 'calevrije', icon: faDragon, label: 'CaleVRije' },
+    { id: 'universo', icon: faGlobe, label: 'Universo' },
+  ];
+  profileIndex = signal(0);
+
+  get profileIcon() {
+    return this.profileModes[this.profileIndex()].icon;
+  }
+
+  getProfileLabel(): string {
+    return this.profileModes[this.profileIndex()].label;
+  }
+
+  // Cada perfil tiene sus propios marcadores (memoria independiente).
+  // Cada memoria se persiste en su PROPIA cookie (web) o su propia clave de Preferences (nativo).
+  readonly BOOKMARKS_COOKIE_PREFIX = 'isdeBookmarks';
+  readonly BOOKMARKS_PREFERENCE_PREFIX = 'isdeBookmarks';
+  readonly BOOKMARKS_MAX_AGE = 60 * 60 * 24 * 365;
+
+  // Slots de memoria independientes, indexados por id de perfil
+  bookmarksMap = signal<Record<string, BookmarkItem[]>>(this.loadBookmarksMap());
+
+  private cookieNameFor(profileId: string): string {
+    return `${this.BOOKMARKS_COOKIE_PREFIX}-${profileId}`;
+  }
+
+  private preferenceNameFor(profileId: string): string {
+    return `${this.BOOKMARKS_PREFERENCE_PREFIX}-${profileId}`;
+  }
+
+  get activeProfileId(): string {
+    return this.profileModes[this.profileIndex()].id;
+  }
+
+  // Todas las memorias de marcadores, por perfil (para que el file-browser conozca
+  // cada marcador con su perfil y pueda gestionar marcas de distintos perfiles a la vez)
+  get profileBookmarksMap(): Record<string, BookmarkItem[]> {
+    return this.bookmarksMap();
+  }
+
+  // Marcadores activos (del perfil actual) para el file-browser
+  bookmarks = signal<BookmarkItem[]>(
+    this.bookmarksMap()[this.profileModes[this.profileIndex()].id] ?? [],
+  );
+
+  // Set inicial/memoria que se le inyecta al menú para el perfil actual
+  get profileBookmarks(): BookmarkItem[] | null {
+    return this.bookmarksMap()[this.activeProfileId] ?? [];
+  }
+
+  cycleProfile(): void {
+    this.persistActiveBookmarks();
+    this.profileIndex.set((this.profileIndex() + 1) % this.profileModes.length);
+    this.loadActiveBookmarks();
+    void this.checkPermissions(this.bookmarks());
+  }
+
+  private persistActiveBookmarks(): void {
+    // Guarda el set del perfil que se está dejando (el actual) ANTES de cambiar el índice
+    const leavingId = this.profileModes[this.profileIndex()].id;
+    this.bookmarksMap.update((map) => ({ ...map, [leavingId]: this.bookmarks() }));
+    this.saveBookmarksFor(leavingId);
+  }
+
+  private loadActiveBookmarks(): void {
+    this.bookmarks.set(
+      this.bookmarksMap()[this.profileModes[this.profileIndex()].id] ?? [],
+    );
+  }
+
+  // --- Persistencia por perfil (una cookie / clave por perfil) ---
+
+  private loadBookmarksMap(): Record<string, BookmarkItem[]> {
+    if (this.isNative()) {
+      // En nativo la carga real se hace en ngOnInit (Preferences async).
+      return {};
+    }
+    const map: Record<string, BookmarkItem[]> = {};
+    for (const mode of this.profileModes) {
+      const items = this.readCookieArray(this.cookieNameFor(mode.id));
+      if (items.length > 0 || this.cookieExists(this.cookieNameFor(mode.id))) {
+        map[mode.id] = items;
+      }
+    }
+    return map;
+  }
+
+  private cookieExists(name: string): boolean {
+    if (typeof document === 'undefined') {
+      return false;
+    }
+    return new RegExp(`(?:^|;\\s*)${name}=`).test(document.cookie);
+  }
+
+  private readCookieArray(name: string): BookmarkItem[] {
+    if (typeof document === 'undefined') {
+      return [];
+    }
+    const matches = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+    if (!matches) {
+      return [];
+    }
+    try {
+      const parsed = JSON.parse(decodeURIComponent(matches[1])) as Array<{
+        name: string;
+        path: string;
+        icon: string;
+        treeUri?: string;
+        treePath?: string;
+      }>;
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+      return parsed
+        .filter((item) => typeof item?.name === 'string' && typeof item?.path === 'string')
+        .map((item) => ({
+          name: item.name,
+          path: item.path,
+          icon: this.matchBookmarkIcon(item.icon),
+          treeUri: typeof item.treeUri === 'string' ? item.treeUri : undefined,
+          treePath: typeof item.treePath === 'string' ? item.treePath : undefined,
+        }));
+    } catch (error) {
+      console.warn(`No se pudieron cargar los marcadores desde la cookie ${name}:`, error);
+      return [];
+    }
+  }
+
+  private serializedBookmarks(items: BookmarkItem[]): Array<{
+    name: string;
+    path: string;
+    icon: string;
+    treeUri?: string;
+    treePath?: string;
+  }> {
+    return items.map(({ name, path, icon, treeUri, treePath }) => ({
+      name,
+      path,
+      icon: icon.iconName,
+      ...(treeUri !== undefined ? { treeUri } : {}),
+      ...(treePath !== undefined ? { treePath } : {}),
+    }));
+  }
+
+  private matchBookmarkIcon(iconName: string) {
+    return resolveBookmarkIcon(iconName);
+  }
+
+  private saveBookmarksFor(profileId: string): void {
+    const items = this.bookmarksMap()[profileId] ?? [];
+    const value = JSON.stringify(this.serializedBookmarks(items));
+    if (this.isNative()) {
+      void Preferences.set({ key: this.preferenceNameFor(profileId), value });
+      return;
+    }
+    if (typeof document === 'undefined') {
+      return;
+    }
+    document.cookie = `${this.cookieNameFor(profileId)}=${encodeURIComponent(value)}; path=/; max-age=${this.BOOKMARKS_MAX_AGE}; SameSite=Lax`;
+  }
+
+  private isNative(): boolean {
+    return Capacitor.isNativePlatform();
+  }
 
   readonly fileBrowser = inject(FileBrowserService);
   @ViewChild('fileBrowserRef') fileBrowserRef?: FileBrowser;
 
   // Ruta de la carpeta seleccionada en el menú
   selectedPath: string = '';
-
-  // Marcadores agregados/guardados desde el menú
-  bookmarks: BookmarkItem[] = [];
 
   // Estado para controlar si el menú está visible o no
   isMenuOpen: boolean = false;
@@ -45,7 +215,10 @@ export class Main implements OnInit {
   }
 
   onBookmarksChange(items: BookmarkItem[]): void {
-    this.bookmarks = items;
+    const id = this.activeProfileId;
+    this.bookmarksMap.update((map) => ({ ...map, [id]: items }));
+    this.bookmarks.set(items);
+    this.saveBookmarksFor(id);
     void this.checkPermissions(items);
   }
 
@@ -54,7 +227,48 @@ export class Main implements OnInit {
   readonly rootTreeUri = signal<string | undefined>(this.loadRootTreeUri());
 
   ngOnInit(): void {
-    void this.checkPermissions(this.bookmarks);
+    if (this.isNative()) {
+      void this.loadBookmarksMapNative();
+    }
+    void this.checkPermissions(this.bookmarks());
+  }
+
+  private async loadBookmarksMapNative(): Promise<void> {
+    const map: Record<string, BookmarkItem[]> = {};
+    for (const mode of this.profileModes) {
+      const { value } = await Preferences.get({ key: this.preferenceNameFor(mode.id) });
+      if (value === null || value === undefined) {
+        continue;
+      }
+      try {
+        const parsed = JSON.parse(value) as Array<{
+          name: string;
+          path: string;
+          icon: string;
+          treeUri?: string;
+          treePath?: string;
+        }>;
+        if (!Array.isArray(parsed)) {
+          continue;
+        }
+        map[mode.id] = parsed
+          .filter((item) => typeof item?.name === 'string' && typeof item?.path === 'string')
+          .map((item) => ({
+            name: item.name,
+            path: item.path,
+            icon: this.matchBookmarkIcon(item.icon),
+            treeUri: typeof item.treeUri === 'string' ? item.treeUri : undefined,
+            treePath: typeof item.treePath === 'string' ? item.treePath : undefined,
+          }));
+      } catch (error) {
+        console.warn(
+          `No se pudieron cargar los marcadores desde Preferences para ${mode.id}:`,
+          error,
+        );
+      }
+    }
+    this.bookmarksMap.set(map);
+    this.loadActiveBookmarks();
   }
 
   private loadRootTreeUri(): string | undefined {
@@ -101,7 +315,7 @@ export class Main implements OnInit {
   setRootTreeUri(treeUri: string): void {
     this.rootTreeUri.set(treeUri);
     this.saveRootTreeUri(treeUri);
-    void this.checkPermissions(this.bookmarks);
+    void this.checkPermissions(this.bookmarks());
   }
 
   private treeUnderRoot(uri: string): boolean {
@@ -185,6 +399,14 @@ export class Main implements OnInit {
 
   onCloseMedia(): void {
     this.mediaEntry.set(null);
+  }
+
+  onMediaRenamed(event: { oldPath: string; newPath: string; newName: string }): void {
+    const current = this.mediaEntry();
+    this.fileBrowser.renameEntry(event.oldPath, event.newName, event.newPath);
+    if (current && current.path === event.oldPath) {
+      this.mediaEntry.set({ ...current, name: event.newName, path: event.newPath });
+    }
   }
 
   async onMoveTriggered(): Promise<void> {

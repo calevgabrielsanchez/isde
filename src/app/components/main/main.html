@@ -10,8 +10,8 @@
         <span class="app-title">isDe</span>
       </div>
 
-      <button class="header-section profile-button" aria-label="Perfil de usuario">
-        <fa-icon [icon]="faSmile" class="fa-icon"></fa-icon>
+      <button class="header-section profile-button" (click)="cycleProfile()" [attr.aria-label]="getProfileLabel()">
+        <fa-icon [icon]="profileIcon" class="fa-icon"></fa-icon>
       </button>
     </header>
 
@@ -22,12 +22,13 @@
         [selectedPath]="selectedPath"
         [permissionMap]="permissionMap()"
         [rootTreeUri]="rootTreeUri()"
+        [profileBookmarks]="profileBookmarks"
         (folderSelected)="onFolderSelected($event)"
         (bookmarksChange)="onBookmarksChange($event)"
         (moveTriggered)="onMoveTriggered()"
         (grantAllAccess)="onGrantAllAccess()"></app-menu>
         @if (fileBrowser.folderName() !== null || fileBrowser.loading() || fileBrowser.error()) {
-          <app-file-browser #fileBrowserRef [class.fb-hidden]="isMenuOpen" [bookmarks]="bookmarks" [permissionMap]="permissionMap()" (click)="onFileBrowserClick()" (openMedia)="onOpenMedia($event)"></app-file-browser>
+          <app-file-browser #fileBrowserRef [class.fb-hidden]="isMenuOpen" [bookmarks]="bookmarks()" [bookmarksByProfile]="profileBookmarksMap" [activeProfileId]="activeProfileId" [permissionMap]="permissionMap()" (click)="onFileBrowserClick()" (openMedia)="onOpenMedia($event)"></app-file-browser>
         }
     </main>
 
@@ -49,6 +50,6 @@
   </div>
 
   @if (mediaEntry(); as entry) {
-    <app-reproductor [entry]="entry" (close)="onCloseMedia()"></app-reproductor>
+    <app-reproductor [entry]="entry" (close)="onCloseMedia()" (renamed)="onMediaRenamed($event)"></app-reproductor>
   }
 </div>

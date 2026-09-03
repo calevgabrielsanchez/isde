@@ -35,7 +35,9 @@
               <fa-icon [icon]="fileIcon(entry)" class="fb-icon" [ngClass]="{ 'fb-folder': entry.kind === 'directory' }"></fa-icon>
             }
           </div>
-          <span class="fb-name" [title]="entry.name" (click)="onItemClick(entry)">{{ entry.name }}</span>
+          @if (!(entry.isImage && entry.thumb)) {
+            <span class="fb-name" [title]="entry.name" (click)="onItemClick(entry)">{{ entry.name }}</span>
+          }
         </div>
       }
     </div>

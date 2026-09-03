@@ -2,7 +2,7 @@ import { Component, computed, effect, inject, input, OnDestroy, output, signal }
 import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faClose, faMusic, faSpinner, faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
+import { faClose, faMusic, faSpinner, faChevronLeft, faChevronRight, faPen, faCheck, faXmark, faSpinner as faSaveSpinner } from '@fortawesome/free-solid-svg-icons';
 import { Capacitor } from '@capacitor/core';
 import { FileTree } from '../../services/file-tree.plugin';
 import { isTextFileName } from '../../services/file-browser.service';
@@ -30,10 +30,20 @@ export class Reproductor implements OnDestroy {
   faSpinner = faSpinner;
   faChevronLeft = faChevronLeft;
   faChevronRight = faChevronRight;
+  faPen = faPen;
+  faCheck = faCheck;
+  faXmark = faXmark;
+  faSaveSpinner = faSaveSpinner;
   isNative = Capacitor.isNativePlatform();
 
   readonly entry = input<BrowserEntry | null>(null);
   readonly close = output<void>();
+  readonly renamed = output<{ oldPath: string; newPath: string; newName: string }>();
+
+  readonly isRenaming = signal<boolean>(false);
+  readonly renameText = signal<string>('');
+  readonly isSavingRename = signal<boolean>(false);
+  readonly renameError = signal<string | null>(null);
 
   readonly mediaUrl = signal<string | null>(null);
   readonly textContent = signal<string | null>(null);
@@ -305,5 +315,110 @@ export class Reproductor implements OnDestroy {
       URL.revokeObjectURL(url);
     }
     this.createdUrls = [];
+  }
+
+  startRename(): void {
+    const entry = this.entry();
+    if (!entry) {
+      return;
+    }
+    this.renameText.set(this.fileBaseName(entry.name));
+    this.renameError.set(null);
+    this.isRenaming.set(true);
+  }
+
+  cancelRename(): void {
+    this.isRenaming.set(false);
+    this.renameError.set(null);
+  }
+
+  private fileBaseName(name: string): string {
+    const dot = name.lastIndexOf('.');
+    return dot > 0 ? name.slice(0, dot) : name;
+  }
+
+  async saveRename(): Promise<void> {
+    const entry = this.entry();
+    const newBase = this.renameText().trim();
+    if (!entry || this.isSavingRename()) {
+      return;
+    }
+    if (!newBase) {
+      this.renameError.set('El nombre no puede estar vacío.');
+      return;
+    }
+    const newName = this.completeName(entry.name, newBase);
+    if (newName === entry.name) {
+      this.isRenaming.set(false);
+      this.renameError.set(null);
+      return;
+    }
+    this.isSavingRename.set(true);
+    this.renameError.set(null);
+    try {
+      const newPath = this.rebuildPath(entry, newName);
+      await this.renameFile(entry, newName);
+      this.renamed.emit({ oldPath: entry.path, newPath, newName });
+      this.renameText.set(newBase);
+      this.isRenaming.set(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.renameError.set(`No se pudo renombrar: ${message}`);
+      console.warn('No se pudo renombrar el archivo:', entry.name, error);
+    } finally {
+      this.isSavingRename.set(false);
+    }
+  }
+
+  private completeName(oldName: string, newBase: string): string {
+    const dot = oldName.lastIndexOf('.');
+    return dot > 0 ? `${newBase}${oldName.slice(dot)}` : newBase;
+  }
+
+  private rebuildPath(entry: BrowserEntry, newName: string): string {
+    if (entry.path.startsWith('content://')) {
+      const slash = entry.path.lastIndexOf('/');
+      const base = slash > 0 ? entry.path.slice(0, slash + 1) : entry.path;
+      return `${base}${newName}`;
+    }
+    const slash = entry.path.lastIndexOf('/');
+    const base = slash > 0 ? entry.path.slice(0, slash + 1) : '';
+    return `${base}${newName}`;
+  }
+
+  private async renameFile(entry: BrowserEntry, newName: string): Promise<void> {
+    if (this.isNative) {
+      await this.renameNative(entry, newName);
+      return;
+    }
+    await this.renameWeb(entry, newName);
+  }
+
+  private async renameWeb(entry: BrowserEntry, newName: string): Promise<void> {
+    const handle = entry.handle as FileSystemFileHandle | undefined;
+    if (!handle) {
+      throw new Error(
+        'Este archivo no se puede renombrar aquí (no hay acceso de escritura a la carpeta).',
+      );
+    }
+    const moveFn = (handle as FileSystemFileHandle & { move?: (n: string) => Promise<void> }).move;
+    if (typeof moveFn === 'function') {
+      await moveFn.call(handle, newName);
+      return;
+    }
+    throw new Error('Tu navegador no permite renombrar el archivo directamente.');
+  }
+
+  private async renameNative(entry: BrowserEntry, newName: string): Promise<void> {
+    const treeMatch = entry.path.match(/^((?:content|file):\/\/[^/]+\/tree\/[^/]+)\/.+$/);
+    if (!treeMatch) {
+      throw new Error('No se pudo determinar el destino del archivo.');
+    }
+    const destTreeUri = treeMatch[1];
+    await FileTree.move({
+      sourceUri: entry.path,
+      destTreeUri,
+      destRelativePath: newName,
+    });
   }
 }
