@@ -95,6 +95,69 @@
   word-break: break-all;
 }
 
+.reproductor-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  max-width: 100%;
+}
+
+.reproductor-rename-input {
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  font-size: 1rem;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  outline: none;
+}
+
+.reproductor-rename-input:focus {
+  border-color: #2ecc71;
+}
+
+.reproductor-rename-btn,
+.reproductor-rename-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  font-size: 1rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.reproductor-rename-btn:hover,
+.reproductor-rename-icon:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.reproductor-rename-icon {
+  width: 24px;
+  height: 24px;
+  font-size: 0.8rem;
+}
+
+.reproductor-rename-spinner {
+  color: #2ecc71;
+  font-size: 1.2rem;
+}
+
+.reproductor-rename-error {
+  color: #e5534b;
+  font-size: 0.9rem;
+  text-align: center;
+  word-break: break-word;
+  max-width: 90%;
+}
+
 .reproductor-error {
   color: #e5534b;
   font-size: 1.1rem;

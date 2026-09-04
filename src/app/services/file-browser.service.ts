@@ -81,6 +81,14 @@ export class FileBrowserService {
     this.entries.update((current) => current.filter((entry) => entry.path !== path));
   }
 
+  renameEntry(oldPath: string, newName: string, newPath: string): void {
+    this.entries.update((current) =>
+      current.map((entry) =>
+        entry.path === oldPath ? { ...entry, name: newName, path: newPath } : entry,
+      ),
+    );
+  }
+
   fail(message: string): void {
     this.loading.set(false);
     this.error.set(message);

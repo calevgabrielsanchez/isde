@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, OnInit, output, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, OnInit, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import {
@@ -34,78 +34,7 @@ export interface BookmarkIconOption {
   icon: IconDefinition;
 }
 
-export interface PickedFolder {
-  path: string;
-  treeUri?: string;
-  treePath?: string;
-}
-
-export interface BookmarkItem {
-  name: string;
-  path: string;
-  icon: IconDefinition;
-  treeUri?: string;
-  treePath?: string;
-}
-
-@Component({
-  imports: [CommonModule, FontAwesomeModule],
-  standalone: true,
-  selector: 'app-menu',
-  styleUrl: './menu.css',
-  templateUrl: './menu.html',
-})
-export class Menu implements OnInit {
-
-  ngOnInit(): void {
-    if (this.isNative) {
-      void this.loadBookmarksFromPreferences().then((items) => {
-        this.bookmarks.set(items);
-        this.bookmarksChange.emit(this.bookmarks());
-      });
-    } else {
-      this.bookmarksChange.emit(this.bookmarks());
-    }
-  }
-
-  faFolderOpen = faFolderOpen;
-  faBookmark = faBookmark;
-  faChevronUp = faChevronUp;
-  faChevronDown = faChevronDown;
-  faPlus = faPlus;
-  faFilePen = faFilePen;
-  faKey = faKey;
-  faTrash = faTrash;
-  faCheck = faCheck;
-  isNative = Capacitor.isNativePlatform();
-
-  private readonly browser = inject(FileBrowserService);
-
-  readonly selectedPath = input<string>('');
-  readonly permissionMap = input<Record<string, boolean>>({});
-  readonly rootTreeUri = input<string | undefined>(undefined);
-  readonly folderSelected = output<string>();
-  readonly bookmarksChange = output<BookmarkItem[]>();
-  readonly moveTriggered = output<void>();
-  readonly grantAllAccess = output<void>();
-  allAccessGranted = computed(() => !!this.rootTreeUri());
-
-  onGrantAllAccess(): void {
-    this.grantAllAccess.emit();
-  }
-  selectedBookmarkIndex = signal<number>(0);
-  selectedDirectory = signal<FileSystemDirectoryHandle | null>(null);
-  selectedFolderPath = signal<string | null>(null);
-  selectedPathAddBookMark = signal<string>('');
-  pendingBookmarkTree = signal<{ treeUri?: string; treePath?: string }>({});
-
-  bookmarks = signal<BookmarkItem[]>(this.loadBookmarksFromCookie());
-
-  bookmarkDenied(bookmark: BookmarkItem): boolean {
-    return !!bookmark.treeUri && this.permissionMap()[bookmark.treeUri] === false;
-  }
-
-  bookmarkIconOptions: BookmarkIconOption[] = [
+export const BOOKMARK_ICON_OPTIONS: BookmarkIconOption[] = [
     { label: 'Marcador', icon: faBookmark },
     { label: 'Corazón', icon: faHeart },
     { label: 'Estrella', icon: faStar },
@@ -195,7 +124,102 @@ export class Menu implements OnInit {
     { label: 'Calavera', icon: faSkull },
     { label: 'Calavera huesos', icon: faSkullCrossbones },
     { label: 'Desarmador-llave', icon: faScrewdriverWrench },
-  ];
+];
+
+export function resolveBookmarkIcon(iconName: string): IconDefinition {
+  return (
+    BOOKMARK_ICON_OPTIONS.find((option) => option.icon.iconName === iconName)?.icon ??
+    faBookmark
+  );
+}
+
+export interface PickedFolder {
+  path: string;
+  treeUri?: string;
+  treePath?: string;
+}
+
+export interface BookmarkItem {
+  name: string;
+  path: string;
+  icon: IconDefinition;
+  treeUri?: string;
+  treePath?: string;
+}
+
+@Component({
+  imports: [CommonModule, FontAwesomeModule],
+  standalone: true,
+  selector: 'app-menu',
+  styleUrl: './menu.css',
+  templateUrl: './menu.html',
+})
+export class Menu implements OnInit {
+
+  ngOnInit(): void {
+    if (this.profileBookmarks()) {
+      this.bookmarks.set(this.profileBookmarks()!);
+      this.bookmarksChange.emit(this.bookmarks());
+      return;
+    }
+    if (this.isNative) {
+      void this.loadBookmarksFromPreferences().then((items) => {
+        this.bookmarks.set(items);
+        this.bookmarksChange.emit(this.bookmarks());
+      });
+    } else {
+      this.bookmarksChange.emit(this.bookmarks());
+    }
+  }
+
+  faFolderOpen = faFolderOpen;
+  faBookmark = faBookmark;
+  faChevronUp = faChevronUp;
+  faChevronDown = faChevronDown;
+  faPlus = faPlus;
+  faFilePen = faFilePen;
+  faKey = faKey;
+  faTrash = faTrash;
+  faCheck = faCheck;
+  isNative = Capacitor.isNativePlatform();
+
+  private readonly browser = inject(FileBrowserService);
+
+  readonly selectedPath = input<string>('');
+  readonly permissionMap = input<Record<string, boolean>>({});
+  readonly rootTreeUri = input<string | undefined>(undefined);
+  readonly profileBookmarks = input<BookmarkItem[] | null>(null);
+  readonly folderSelected = output<string>();
+  readonly bookmarksChange = output<BookmarkItem[]>();
+  readonly moveTriggered = output<void>();
+  readonly grantAllAccess = output<void>();
+  allAccessGranted = computed(() => !!this.rootTreeUri());
+
+  constructor() {
+    effect(() => {
+      const items = this.profileBookmarks();
+      if (items) {
+        this.bookmarks.set(items);
+      }
+    });
+  }
+
+  onGrantAllAccess(): void {
+    this.grantAllAccess.emit();
+  }
+  selectedBookmarkIndex = signal<number>(0);
+  selectedDirectory = signal<FileSystemDirectoryHandle | null>(null);
+  selectedFolderPath = signal<string | null>(null);
+  selectedPathAddBookMark = signal<string>('');
+  pendingBookmarkTree = signal<{ treeUri?: string; treePath?: string }>({});
+
+  bookmarks = signal<BookmarkItem[]>(this.loadBookmarksFromCookie());
+
+  bookmarkDenied(bookmark: BookmarkItem): boolean {
+    return !!bookmark.treeUri && this.permissionMap()[bookmark.treeUri] === false;
+  }
+
+  bookmarkIconOptions: BookmarkIconOption[] = BOOKMARK_ICON_OPTIONS;
 
   selectedBookmarkIconIndex = signal<number>(0);
   selectedBookmarkIcon = computed(() => this.bookmarkIconOptions[this.selectedBookmarkIconIndex()]?.icon ?? faBookmark);
