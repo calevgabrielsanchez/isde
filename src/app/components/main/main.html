@@ -32,16 +32,32 @@
     </main>
 
     <!-- Barra de estado inferior -->
-    <footer class="app-footer" [class.app-footer-active]="statusInfo.total > 0">
-      @if (statusInfo.total > 0) {
+    <footer class="app-footer" [class.app-footer-active]="statusInfo.total > 0" [class.app-footer-progressing]="moveProgress() !== null || fileBrowser.loading()">
+      @if (fileBrowser.loading()) {
+        <div class="app-footer-progress app-footer-loading">
+          <div class="app-footer-progress-track">
+            <div class="app-footer-progress-fill app-footer-progress-indeterminate"></div>
+          </div>
+          <span class="app-footer-progress-label">Cargando archivos...</span>
+        </div>
+      } @else if (moveProgress(); as progress) {
+        <div class="app-footer-progress">
+          <div class="app-footer-progress-track">
+            <div class="app-footer-progress-fill" [style.width.%]="progress.current / progress.total * 100"></div>
+          </div>
+          <span class="app-footer-progress-label">Moviendo {{ progress.current }} de {{ progress.total }}...</span>
+        </div>
+      } @else if (statusInfo.total > 0) {
         <span class="app-footer-count">{{ statusInfo.total }} archivo(s) → mover a:</span>
-        @for (target of statusInfo.targets; track $index) {
-          <span class="app-footer-target" [class.app-footer-target-denied]="bookmarkDenied(target.bookmark)">
-            <fa-icon [icon]="target.bookmark.icon" class="app-footer-icon"></fa-icon>
-            <span class="app-footer-name">{{ target.bookmark.name }}</span>
-            <span class="app-footer-n">({{ target.count }})</span>
-          </span>
-        }
+        <div class="app-footer-list">
+          @for (target of statusInfo.targets; track $index) {
+            <span class="app-footer-target" [class.app-footer-target-denied]="bookmarkDenied(target.bookmark)">
+              <fa-icon [icon]="target.bookmark.icon" class="app-footer-icon"></fa-icon>
+              <span class="app-footer-name">{{ target.bookmark.name }}</span>
+              <span class="app-footer-n">({{ target.count }})</span>
+            </span>
+          }
+        </div>
       } @else {
         <span class="app-footer-hint">Toca el marcador en un archivo para elegir su destino.</span>
       }

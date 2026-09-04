@@ -24,7 +24,10 @@
               [ngStyle]="bookmarkStyle(slot.position)"
               [attr.title]="bookmarkDenied(slot.bookmark) ? slot.bookmark.name + ' (sin permiso)' : slot.bookmark.name"
               [attr.aria-label]="slot.bookmark.name"
-              (click)="onFileBrowserClick(entry.path, $index)">
+              (click)="onFileBrowserClick(entry.path, $index)"
+              (pointerdown)="startLongPressTooltip($event, entry.path, $index)"
+              (pointerup)="cancelLongPressTooltip()"
+              (pointerleave)="cancelLongPressTooltip()">
               <fa-icon [icon]="slot.bookmark.icon" class="fa-icon"></fa-icon>
             </button>
           }
@@ -43,5 +46,10 @@
     <div class="fb-status">La carpeta está vacía.</div>
   } @else {
     <div class="fb-status">Abre una carpeta para ver su contenido.</div>
+  }
+  @if (longPressTooltip(); as tooltip) {
+    <div class="fb-longpress-tooltip" [style.left.px]="tooltip.x" [style.top.px]="tooltip.y">
+      {{ tooltip.text }}
+    </div>
   }
 </div>

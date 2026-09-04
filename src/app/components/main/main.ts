@@ -54,7 +54,9 @@ export class Main implements OnInit {
   readonly rootTreeUri = signal<string | undefined>(this.loadRootTreeUri());
 
   ngOnInit(): void {
-    void this.checkPermissions(this.bookmarks);
+    // Validación de permisos de marcadores al iniciar la app (desactivada temporalmente).
+    // Para reactivarla, descomenta la siguiente línea:
+    // void this.checkPermissions(this.bookmarks);
   }
 
   private loadRootTreeUri(): string | undefined {
@@ -188,7 +190,32 @@ export class Main implements OnInit {
   }
 
   async onMoveTriggered(): Promise<void> {
-    await this.fileBrowserRef?.moveSelectedToBookmarks();
+    void this.fileBrowserRef?.moveSelectedToBookmarks();
+    this.syncProgress();
     this.refreshStatus();
+  }
+
+  readonly moveProgress = signal<{ current: number; total: number } | null>(null);
+
+  private progressTimer: ReturnType<typeof setInterval> | null = null;
+
+  syncProgress(): void {
+    const progress = this.fileBrowserRef?.moveProgress() ?? null;
+    this.moveProgress.set(progress);
+    if (progress) {
+      if (!this.progressTimer) {
+        this.progressTimer = setInterval(() => {
+          const current = this.fileBrowserRef?.moveProgress() ?? null;
+          this.moveProgress.set(current);
+          if (!current && this.progressTimer) {
+            clearInterval(this.progressTimer);
+            this.progressTimer = null;
+          }
+        }, 200);
+      }
+    } else if (this.progressTimer) {
+      clearInterval(this.progressTimer);
+      this.progressTimer = null;
+    }
   }
 }

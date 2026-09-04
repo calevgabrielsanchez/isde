@@ -123,36 +123,55 @@ app-menu.menu-hidden {
 
 /* --- Barra de estado inferior --- */
 .app-footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  min-height: 48px;
-  padding: 8px 12px;
-  background-color: var(--bg-header);
-  border-top: 2px solid var(--border-color);
-  color: var(--text-color);
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  font-size: 0.85rem;
+     display: flex;
+    flex-direction: column;
+    /* align-items: stretch; */
+    gap: 6px;
+    height: 100px;
+    min-height: 48px;
+    /* max-height: 48px; */
+    padding: 6px 12px;
+    background-color: var(--bg-header);
+    border-top: 2px solid var(--border-color);
+    color: var(--text-color);
+    font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif;
+    font-size: .85rem;
+    /* overflow: clip; */
 }
 
 .app-footer-active {
   border-top-color: var(--selected-color);
-  overflow: auto;
+}
+
+.app-footer-progressing,
+.app-footer-loading {
+  height: 96px;
+  min-height: 96px;
+  max-height: 96px;
 }
 
 .app-footer-count {
   font-weight: 600;
+  white-space: nowrap;
+}
+
+.app-footer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .app-footer-target {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 6px;
-  padding: 2px 10px;
+  padding: 4px 10px;
   border: 1px solid var(--selected-color);
-  border-radius: 12px;
+  border-radius: 6px;
+  width: 100%;
 }
 
 .app-footer-target-denied {
@@ -179,5 +198,45 @@ app-menu.menu-hidden {
 
 .app-footer-hint {
   opacity: 0.8;
+  font-size: 0.8rem;
+}
+
+.app-footer-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.app-footer-progress-track {
+  width: 100%;
+  height: 10px;
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.app-footer-progress-fill {
+  height: 100%;
+  width: 0;
+  background-color: #2ecc71;
+  transition: width 0.2s ease;
+}
+
+.app-footer-progress-indeterminate {
+  width: 40%;
+  animation: isde-progress-indeterminate 1.2s ease-in-out infinite;
+}
+
+@keyframes isde-progress-indeterminate {
+  0% { margin-left: -40%; }
+  100% { margin-left: 100%; }
+}
+
+.app-footer-progress-label {
+  text-align: left;
+  color: var(--text-color);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   font-size: 0.8rem;
 }

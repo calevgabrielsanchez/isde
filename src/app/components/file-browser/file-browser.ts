@@ -44,7 +44,8 @@ export interface BookmarkPosition {
 }
 
 const EDGE_ORDER: BookmarkEdge[] = ['top', 'bottom', 'left', 'right'];
-const EDGE_CAPS: Record<BookmarkEdge, number> = { top: 6, bottom: 6, left: 3, right: 3 };
+const EDGE_CAPS: Record<BookmarkEdge, number> = { top: 6, bottom: 6, left: 6, right: 6 };
+const MAX_BOOKMARKS = EDGE_ORDER.reduce((sum, edge) => sum + EDGE_CAPS[edge], 0);
 
 function bookmarkPositions(total: number): BookmarkPosition[] {
   const counts: Record<BookmarkEdge, number> = { top: 0, bottom: 0, left: 0, right: 0 };
@@ -113,7 +114,7 @@ export class FileBrowser {
   }
 
   readonly bookmarkSlots = computed(() => {
-    const items = this.bookmarks();
+    const items = this.bookmarks().slice(0, MAX_BOOKMARKS);
     return bookmarkPositions(items.length).map((position, index) => ({
       position,
       bookmark: items[index],
@@ -136,6 +137,35 @@ export class FileBrowser {
   readonly selectedBookmarkIndex = signal<Record<string, number>>({});
 
   readonly moveProgress = signal<{ current: number; total: number } | null>(null);
+
+  readonly longPressTooltip = signal<{ text: string; x: number; y: number } | null>(null);
+  private longPressTimer: ReturnType<typeof setTimeout> | null = null;
+
+  startLongPressTooltip(event: PointerEvent, entryPath: string, slotIndex: number): void {
+    const bookmark = this.bookmarks()[slotIndex];
+    const target = event.currentTarget as HTMLElement | null;
+    if (!bookmark || !target) {
+      return;
+    }
+    const text = this.bookmarkDenied(bookmark)
+      ? `${bookmark.name} (sin permiso)`
+      : bookmark.name;
+    const rect = target.getBoundingClientRect();
+    if (this.longPressTimer) {
+      clearTimeout(this.longPressTimer);
+    }
+    this.longPressTimer = setTimeout(() => {
+      this.longPressTooltip.set({ text, x: rect.left + rect.width / 2, y: rect.top });
+    }, 500);
+  }
+
+  cancelLongPressTooltip(): void {
+    if (this.longPressTimer) {
+      clearTimeout(this.longPressTimer);
+      this.longPressTimer = null;
+    }
+    this.longPressTooltip.set(null);
+  }
 
   readonly statusSummary = computed(() => {
     const indexMap = this.selectedBookmarkIndex();

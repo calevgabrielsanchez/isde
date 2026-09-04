@@ -15,7 +15,7 @@
     
     <div class="list-container">
       <div class="list-content">
-        @for (item of bookmarks(); track item.name; let i = $index) {
+        @for (item of bookmarks().slice(0, 24); track item.name; let i = $index) {
           <div 
             class="bookmark-item"
             [class.selected]="i === selectedBookmarkIndex()"
