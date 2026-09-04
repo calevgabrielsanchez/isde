@@ -14,7 +14,10 @@
   } @else if (visibleEntries().length > 0) {
     <div class="fb-grid">
       @for (entry of visibleEntries(); track entry.path) {
-        <div class="fb-item" [class.fb-directory]="entry.kind === 'directory'">
+        <div
+          class="fb-item"
+          [class.fb-directory]="entry.kind === 'directory'"
+          [class.fb-item-marked]="isEntryMarked(entry.path)">
           @for (slot of bookmarkSlots(); track $index) {
             <button
               type="button"

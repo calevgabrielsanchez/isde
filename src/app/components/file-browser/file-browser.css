@@ -43,6 +43,15 @@
   background-color: rgba(0, 85, 138, 0.2);
 }
 
+.fb-item-marked {
+  border-color: #006b45;
+  background-color: #525f598c;
+}
+
+.fb-item-marked:hover {
+  background-color: #525f598c;
+}
+
 .fb-bookmark {
   position: absolute;
   z-index: 2;

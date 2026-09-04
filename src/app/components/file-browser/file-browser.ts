@@ -235,6 +235,10 @@ export class FileBrowser {
     return !!sel && sel.profileId === this.activeProfileId() && sel.index === slotIndex;
   }
 
+  isEntryMarked(entryPath: string): boolean {
+    return this.selectedBookmark()[entryPath] !== undefined;
+  }
+
   private bookmarkForSelection(sel: { profileId: string; index: number }): BookmarkItem | undefined {
     return this.bookmarksByProfile()[sel.profileId]?.[sel.index];
   }
