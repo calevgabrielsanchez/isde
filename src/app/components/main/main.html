@@ -2,16 +2,24 @@
   <div class="app-container">
     <!-- Cabecera de la aplicación -->
     <header class="app-header">
-      <button class="header-section menu-button" (click)="toggleMenu()" aria-label="Abrir menú">
-        <fa-icon [icon]="faBars" class="fa-icon"></fa-icon>
+      <button type="button" class="header-section" (click)="toggleMenu()" aria-label="Abrir menú">
+        <fa-icon [icon]="faBurger" class="fa-icon"></fa-icon>
       </button>
 
-      <div class="header-section title-section">
-        <span class="app-title">isDe</span>
-      </div>
+      <button type="button" class="header-section" [class.header-section-active]="activeProfileId === 'archivos'" (click)="selectProfile('archivos')" aria-label="Documentos">
+        <fa-icon [icon]="faFolderOpen" class="fa-icon"></fa-icon>
+      </button>
 
-      <button class="header-section profile-button" (click)="cycleProfile()" [attr.aria-label]="getProfileLabel()">
-        <fa-icon [icon]="profileIcon" class="fa-icon"></fa-icon>
+      <button type="button" class="header-section" [class.header-section-active]="activeProfileId === 'calevrije'" (click)="selectProfile('calevrije')" aria-label="CaleVRije">
+        <fa-icon [icon]="faDragon" class="fa-icon"></fa-icon>
+      </button>
+
+      <button type="button" class="header-section" [class.header-section-active]="activeProfileId === 'universo'" (click)="selectProfile('universo')" aria-label="Universo">
+        <fa-icon [icon]="faGlobe" class="fa-icon"></fa-icon>
+      </button>
+
+      <button type="button" class="header-section" [class.header-section-active]="activeProfileId === 'descanso'" (click)="selectProfile('descanso')" aria-label="Descanso">
+        <fa-icon [icon]="faCoffee" class="fa-icon"></fa-icon>
       </button>
     </header>
 

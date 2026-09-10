@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, signal, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faBars, faSmile, faFolderOpen, faDragon, faGlobe } from '@fortawesome/free-solid-svg-icons';
+import { faBurger, faSmile, faFolderOpen, faDragon, faGlobe, faCoffee } from '@fortawesome/free-solid-svg-icons';
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { Menu } from "../menu/menu";
@@ -21,17 +21,19 @@ import { resolveBookmarkIcon } from "../menu/menu";
 export class Main implements OnInit {
 
   // Iconos de FontAwesome
-  faBars = faBars;
+  faBurger = faBurger;
   faSmile = faSmile;
   faFolderOpen = faFolderOpen;
   faDragon = faDragon;
   faGlobe = faGlobe;
+  faCoffee = faCoffee;
 
-  // Modos del botón de perfil (ciclo al hacer clic)
+  // Modos del botón de perfil (cada botón del header selecciona su perfil directo)
   profileModes = [
     { id: 'archivos', icon: faFolderOpen, label: 'Archivos' },
     { id: 'calevrije', icon: faDragon, label: 'CaleVRije' },
     { id: 'universo', icon: faGlobe, label: 'Universo' },
+    { id: 'descanso', icon: faCoffee, label: 'Descanso' },
   ];
   profileIndex = signal(0);
 
@@ -80,9 +82,13 @@ export class Main implements OnInit {
     return this.bookmarksMap()[this.activeProfileId] ?? [];
   }
 
-  cycleProfile(): void {
+  selectProfile(profileId: string): void {
+    const targetIndex = this.profileModes.findIndex((mode) => mode.id === profileId);
+    if (targetIndex === -1 || targetIndex === this.profileIndex()) {
+      return;
+    }
     this.persistActiveBookmarks();
-    this.profileIndex.set((this.profileIndex() + 1) % this.profileModes.length);
+    this.profileIndex.set(targetIndex);
     this.loadActiveBookmarks();
     void this.checkPermissions(this.bookmarks());
   }
