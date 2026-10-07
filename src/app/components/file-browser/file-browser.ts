@@ -47,7 +47,7 @@ const EDGE_ORDER: BookmarkEdge[] = ['top', 'bottom', 'left', 'right'];
 const EDGE_CAPS: Record<BookmarkEdge, number> = { top: 6, bottom: 6, left: 6, right: 6 };
 const MAX_BOOKMARKS = EDGE_ORDER.reduce((sum, edge) => sum + EDGE_CAPS[edge], 0);
 
-function bookmarkPositions(total: number): BookmarkPosition[] {
+export function bookmarkPositions(total: number): BookmarkPosition[] {
   const counts: Record<BookmarkEdge, number> = { top: 0, bottom: 0, left: 0, right: 0 };
   let remaining = total;
   for (const edge of EDGE_ORDER) {
@@ -89,6 +89,18 @@ export class FileBrowser {
   }
 
   readonly fileBrowser = inject(FileBrowserService);
+
+  scrollPosition(): number {
+    return document.querySelector<HTMLElement>('app-file-browser .file-browser')?.scrollTop ?? 0;
+  }
+
+  restoreScrollPosition(position: number): void {
+    const scrollContainer = document.querySelector<HTMLElement>('app-file-browser .file-browser');
+    if (scrollContainer) {
+      scrollContainer.scrollTop = position;
+    }
+  }
+
   readonly visibleEntries = computed(() =>
     this.fileBrowser.entries().filter((entry) => entry.kind !== 'directory'),
   );
@@ -210,13 +222,13 @@ export class FileBrowser {
     }));
   }
 
-  onFileBrowserClick(entryPath: string, slotIndex: number): void {
+  onFileBrowserClick(entryPath: string, slotIndex: number): boolean {
     const bookmark = this.activeProfileBookmarks()[slotIndex];
     if (bookmark && this.bookmarkDenied(bookmark)) {
       window.alert(
         `El marcador '${bookmark.name}' no tiene permiso para mover archivos. Bórralo y créalo de nuevo desde el dispositivo.`,
       );
-      return;
+      return false;
     }
     const profileId = this.activeProfileId();
     this.selectedBookmark.update((current) => {
@@ -228,6 +240,7 @@ export class FileBrowser {
       }
       return { ...current, [entryPath]: { profileId, index: slotIndex } };
     });
+    return true;
   }
 
   isBookmarkSelected(entryPath: string, slotIndex: number): boolean {

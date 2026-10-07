@@ -209,10 +209,26 @@ export class Main implements OnInit {
 
   // Estado para controlar si el menú está visible o no
   isMenuOpen: boolean = false;
+  private fileBrowserScrollPosition = 0;
+  private appContentScrollPosition = 0;
 
   // Método para alternar la visibilidad del menú
   toggleMenu(): void {
+    if (!this.isMenuOpen) {
+      this.fileBrowserScrollPosition = this.fileBrowserRef?.scrollPosition() ?? 0;
+      this.appContentScrollPosition =
+        document.querySelector<HTMLElement>('.app-content')?.scrollTop ?? 0;
+    }
     this.isMenuOpen = !this.isMenuOpen;
+    if (!this.isMenuOpen) {
+      requestAnimationFrame(() => {
+        const appContent = document.querySelector<HTMLElement>('.app-content');
+        if (appContent) {
+          appContent.scrollTop = this.appContentScrollPosition;
+        }
+        this.fileBrowserRef?.restoreScrollPosition(this.fileBrowserScrollPosition);
+      });
+    }
   }
 
   onFolderSelected(path: string): void {
@@ -401,6 +417,22 @@ export class Main implements OnInit {
 
   onOpenMedia(entry: BrowserEntry): void {
     this.mediaEntry.set(entry);
+  }
+
+  onViewerBookmarkSelected(bookmarkIndex: number): void {
+    const current = this.mediaEntry();
+    if (!current || !this.fileBrowserRef) {
+      return;
+    }
+    if (!this.fileBrowserRef.onFileBrowserClick(current.path, bookmarkIndex)) {
+      return;
+    }
+    const files = this.fileBrowser.entries().filter((entry) => entry.kind !== 'directory');
+    const currentIndex = files.findIndex((entry) => entry.path === current.path);
+    const nextEntry = currentIndex >= 0 ? files[currentIndex + 1] : undefined;
+    if (nextEntry) {
+      this.onOpenMedia(nextEntry);
+    }
   }
 
   onCloseMedia(): void {

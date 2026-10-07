@@ -74,6 +74,17 @@
   </div>
 
   @if (mediaEntry(); as entry) {
-    <app-reproductor [entry]="entry" (close)="onCloseMedia()" (renamed)="onMediaRenamed($event)"></app-reproductor>
+    <app-reproductor
+      [entry]="entry"
+      [entries]="fileBrowser.entries()"
+      [bookmarks]="bookmarks()"
+      [selectedBookmarks]="fileBrowserRef?.selectedBookmark() ?? {}"
+      [activeProfileId]="activeProfileId"
+      [permissionMap]="permissionMap()"
+      (bookmarkSelected)="onViewerBookmarkSelected($event)"
+      (close)="onCloseMedia()"
+      (navigate)="onOpenMedia($event)"
+      (renamed)="onMediaRenamed($event)"
+    ></app-reproductor>
   }
 </div>

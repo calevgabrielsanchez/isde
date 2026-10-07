@@ -4,7 +4,48 @@
       <fa-icon [icon]="faClose"></fa-icon>
     </button>
 
-    <div class="reproductor-stage" (click)="$event.stopPropagation()">
+    @if (!isNative) {
+      <button
+        class="reproductor-navigation reproductor-navigation-previous"
+        type="button"
+        aria-label="Archivo anterior"
+        [disabled]="!fileNavigation().previous"
+        (click)="$event.stopPropagation(); navigateTo(fileNavigation().previous)"
+      >
+        <fa-icon [icon]="faChevronLeft"></fa-icon>
+      </button>
+      <button
+        class="reproductor-navigation reproductor-navigation-next"
+        type="button"
+        aria-label="Archivo siguiente"
+        [disabled]="!fileNavigation().next"
+        (click)="$event.stopPropagation(); navigateTo(fileNavigation().next)"
+      >
+        <fa-icon [icon]="faChevronRight"></fa-icon>
+      </button>
+    }
+
+    <div
+      class="reproductor-stage"
+      (click)="$event.stopPropagation()"
+      (pointerdown)="onSwipeStart($event)"
+      (pointerup)="onSwipeEnd($event)"
+      (pointercancel)="cancelSwipe()"
+    >
+      @for (slot of bookmarkSlots(); track $index) {
+        <button
+          type="button"
+          class="reproductor-bookmark reproductor-bookmark-{{ slot.position.edge }}"
+          [class.reproductor-bookmark-selected]="isBookmarkSelected(slot.index)"
+          [class.reproductor-bookmark-denied]="bookmarkDenied(slot.bookmark)"
+          [ngStyle]="bookmarkStyle(slot.position)"
+          [attr.title]="slot.bookmark.name"
+          [attr.aria-label]="'Asignar a ' + slot.bookmark.name + ' y avanzar al siguiente archivo'"
+          (click)="$event.stopPropagation(); selectBookmark(slot.index)"
+        >
+          <fa-icon [icon]="slot.bookmark.icon"></fa-icon>
+        </button>
+      }
       @switch (mediaKind()) {
         @case ('image') {
           @if (mediaUrl(); as url) {

@@ -28,6 +28,7 @@ const IMAGE_EXTENSION = /\.(jpe?g|png|gif|bmp|webp|svg|avif|ico)$/i;
 const BOOKMARKS_COOKIE = 'isdeBookmarks';
 const BOOKMARKS_PREFERENCE = 'isdeBookmarks';
 const BOOKMARKS_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+const LAST_NATIVE_SOURCE_TREE_KEY = 'isdeLastNativeSourceTree';
 
 export interface BookmarkIconOption {
   label: string;
@@ -202,6 +203,9 @@ export class Menu implements OnInit {
         this.bookmarks.set(items);
       }
     });
+    if (this.isNative) {
+      void this.restoreLastNativeFolder();
+    }
   }
 
   onGrantAllAccess(): void {
@@ -464,8 +468,8 @@ export class Menu implements OnInit {
   private async pickFolderPath(): Promise<PickedFolder | null> {
     if (Capacitor.isNativePlatform()) {
       try {
-        const result = await FilePicker.pickDirectory();
-        const pickedPath = result.path;
+        const result = await FileTree.pickTree({ startDocumentUri: undefined });
+        const pickedPath = result.treeUri;
         const tree = this.folderTreeInfo(pickedPath);
         return { path: this.rootPathFromPickedPath(pickedPath), ...tree };
       } catch (error) {
@@ -565,8 +569,8 @@ export class Menu implements OnInit {
   private async openNativeFolder(): Promise<void> {
     let pickedPath: string;
     try {
-      const result = await FilePicker.pickDirectory();
-      pickedPath = result.path;
+      const result = await FileTree.pickTree({ startDocumentUri: undefined });
+      pickedPath = result.treeUri;
       console.log('Carpeta seleccionada:', pickedPath);
     } catch (error) {
       if (!(error instanceof Error) || error.message !== 'pickDirectory canceled.') {
@@ -575,6 +579,28 @@ export class Menu implements OnInit {
       return;
     }
 
+    await Preferences.set({ key: LAST_NATIVE_SOURCE_TREE_KEY, value: pickedPath });
+    await this.loadNativeFolder(pickedPath);
+  }
+
+  private async restoreLastNativeFolder(): Promise<void> {
+    try {
+      const { value } = await Preferences.get({ key: LAST_NATIVE_SOURCE_TREE_KEY });
+      if (!value) {
+        return;
+      }
+      const { ok } = await FileTree.check({ treeUri: value });
+      if (!ok) {
+        await Preferences.remove({ key: LAST_NATIVE_SOURCE_TREE_KEY });
+        return;
+      }
+      await this.loadNativeFolder(value);
+    } catch (error) {
+      console.warn('No se pudo restaurar la última carpeta:', error);
+    }
+  }
+
+  private async loadNativeFolder(pickedPath: string): Promise<void> {
     const absolutePath = this.rootPathFromPickedPath(pickedPath);
     const folderName = this.folderNameFromPath(absolutePath);
     console.log('Nombre de la carpeta:', folderName);

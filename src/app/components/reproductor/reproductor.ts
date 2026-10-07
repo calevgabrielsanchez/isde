@@ -7,6 +7,8 @@ import { Capacitor } from '@capacitor/core';
 import { FileTree } from '../../services/file-tree.plugin';
 import { isTextFileName } from '../../services/file-browser.service';
 import type { BrowserEntry } from '../../services/file-browser.service';
+import { bookmarkPositions, type BookmarkPosition } from '../file-browser/file-browser';
+import type { BookmarkItem } from '../menu/menu';
 
 const VIDEO_EXTENSION = /\.(mp4|webm|m4v|ogv|mov|mkv|3gp|3g2)$/i;
 const AUDIO_EXTENSION = /\.(mp3|m4a|ogg|oga|wav|flac|aac|opus|wma)$/i;
@@ -37,7 +39,14 @@ export class Reproductor implements OnDestroy {
   isNative = Capacitor.isNativePlatform();
 
   readonly entry = input<BrowserEntry | null>(null);
+  readonly entries = input<BrowserEntry[]>([]);
+  readonly bookmarks = input<BookmarkItem[]>([]);
+  readonly selectedBookmarks = input<Record<string, { profileId: string; index: number }>>({});
+  readonly activeProfileId = input('');
+  readonly permissionMap = input<Record<string, boolean>>({});
   readonly close = output<void>();
+  readonly navigate = output<BrowserEntry>();
+  readonly bookmarkSelected = output<number>();
   readonly renamed = output<{ oldPath: string; newPath: string; newName: string }>();
 
   readonly isRenaming = signal<boolean>(false);
@@ -58,6 +67,22 @@ export class Reproductor implements OnDestroy {
     const url = this.mediaUrl();
     return url ? this.sanitizer.bypassSecurityTrustResourceUrl(url) : null;
   });
+  readonly fileNavigation = computed(() => {
+    const currentPath = this.entry()?.path;
+    const files = this.entries().filter((item) => item.kind !== 'directory');
+    const index = files.findIndex((item) => item.path === currentPath);
+    return {
+      previous: index > 0 ? files[index - 1] : null,
+      next: index >= 0 && index < files.length - 1 ? files[index + 1] : null,
+    };
+  });
+  readonly bookmarkSlots = computed(() =>
+    bookmarkPositions(this.bookmarks().length).map((position, index) => ({
+      position,
+      bookmark: this.bookmarks()[index]!,
+      index,
+    })),
+  );
 
   readonly mediaKind = computed<MediaKind>(() => {
     const entry = this.entry();
@@ -85,6 +110,80 @@ export class Reproductor implements OnDestroy {
   private readonly sanitizer = inject(DomSanitizer);
   private generation = 0;
   private createdUrls: string[] = [];
+  private swipeStart: { x: number; y: number } | null = null;
+
+  onSwipeStart(event: PointerEvent): void {
+    if (event.pointerType !== 'touch') {
+      return;
+    }
+    this.swipeStart = { x: event.clientX, y: event.clientY };
+  }
+
+  onSwipeEnd(event: PointerEvent): void {
+    const start = this.swipeStart;
+    this.swipeStart = null;
+    if (!start || event.pointerType !== 'touch') {
+      return;
+    }
+
+    const deltaX = event.clientX - start.x;
+    const deltaY = event.clientY - start.y;
+    if (Math.abs(deltaX) < 60 || Math.abs(deltaX) <= Math.abs(deltaY)) {
+      return;
+    }
+
+    const current = this.entry();
+    const files = this.entries().filter((item) => item.kind !== 'directory');
+    const currentIndex = files.findIndex((item) => item.path === current?.path);
+    if (currentIndex < 0) {
+      return;
+    }
+
+    // Deslizar a la izquierda avanza; deslizar a la derecha retrocede.
+    const nextIndex = currentIndex + (deltaX < 0 ? 1 : -1);
+    const nextEntry = files[nextIndex];
+    if (nextEntry) {
+      this.navigate.emit(nextEntry);
+    }
+  }
+
+  cancelSwipe(): void {
+    this.swipeStart = null;
+  }
+
+  navigateTo(entry: BrowserEntry | null): void {
+    if (entry) {
+      this.navigate.emit(entry);
+    }
+  }
+
+  bookmarkStyle(position: BookmarkPosition): Record<string, string> {
+    switch (position.edge) {
+      case 'top':
+        return { left: `${(position.offset + 1) * (100 / (position.count + 1))}%`, top: '0' };
+      case 'bottom':
+        return { left: `${(position.offset + 1) * (100 / (position.count + 1))}%`, bottom: '0' };
+      case 'left':
+        return { top: `${(position.offset + 1) * (100 / (position.count + 1))}%`, left: '0' };
+      case 'right':
+        return { top: `${(position.offset + 1) * (100 / (position.count + 1))}%`, right: '0' };
+      default:
+        return {};
+    }
+  }
+
+  isBookmarkSelected(index: number): boolean {
+    const selected = this.selectedBookmarks()[this.entry()?.path ?? ''];
+    return selected?.profileId === this.activeProfileId() && selected.index === index;
+  }
+
+  bookmarkDenied(bookmark: BookmarkItem): boolean {
+    return !!bookmark.treeUri && this.permissionMap()[bookmark.treeUri] === false;
+  }
+
+  selectBookmark(index: number): void {
+    this.bookmarkSelected.emit(index);
+  }
 
   constructor() {
     effect(() => {

@@ -3,10 +3,10 @@
   --bg-body: #222226;
   --bg-app: #2c2c31;
   --bg-header: #37373e;
-  --border-color: #00558a;
-  --text-color: #62c0f4;
-  --fontawesome-color: #cb00b0;
-  --selected-color: #44e233;
+  --border-color: #00A3E0;
+  --text-color: #00A3E0;
+  --fontawesome-color: #EC4AA8;
+  --selected-color: #5CCB3A;
   
   display: block;
   width: 100vw;
@@ -89,7 +89,7 @@
 }
 
 .header-section-active .fa-icon {
-  color: var(--selected-color, #44e233);
+  color: var(--selected-color, #5CCB3A);
 }
 
 /* Estilo para los íconos FontAwesome */
