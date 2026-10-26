@@ -116,6 +116,21 @@
   color: #ff5b5b;
 }
 
+.reproductor-longpress-tooltip {
+  position: fixed;
+  z-index: 1000;
+  transform: translate(-50%, calc(-100% - 8px));
+  padding: 4px 8px;
+  background-color: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  border: 1px solid var(--border-color, #00A3E0);
+  border-radius: 4px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .reproductor-media {
   max-width: 100%;
   max-height: 76vh;

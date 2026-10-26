@@ -42,6 +42,10 @@
           [attr.title]="slot.bookmark.name"
           [attr.aria-label]="'Asignar a ' + slot.bookmark.name + ' y avanzar al siguiente archivo'"
           (click)="$event.stopPropagation(); selectBookmark(slot.index)"
+          (pointerdown)="startLongPressTooltip($event, slot.position.edge, slot.bookmark)"
+          (pointerup)="cancelLongPressTooltip()"
+          (pointerleave)="cancelLongPressTooltip()"
+          (pointercancel)="cancelLongPressTooltip()"
         >
           <fa-icon [icon]="slot.bookmark.icon"></fa-icon>
         </button>
@@ -143,5 +147,10 @@
         <div class="reproductor-rename-error">{{ error }}</div>
       }
     </div>
+    @if (longPressTooltip(); as tooltip) {
+      <div class="reproductor-longpress-tooltip" [style.left.px]="tooltip.x" [style.top.px]="tooltip.y">
+        {{ tooltip.text }}
+      </div>
+    }
   </div>
 }

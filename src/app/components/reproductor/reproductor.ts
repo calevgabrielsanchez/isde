@@ -53,6 +53,8 @@ export class Reproductor implements OnDestroy {
   readonly renameText = signal<string>('');
   readonly isSavingRename = signal<boolean>(false);
   readonly renameError = signal<string | null>(null);
+  readonly longPressTooltip = signal<{ text: string; x: number; y: number } | null>(null);
+  private longPressTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly mediaUrl = signal<string | null>(null);
   readonly textContent = signal<string | null>(null);
@@ -160,7 +162,7 @@ export class Reproductor implements OnDestroy {
   bookmarkStyle(position: BookmarkPosition): Record<string, string> {
     switch (position.edge) {
       case 'top':
-        return { left: `${(position.offset + 1) * (100 / (position.count + 1))}%`, top: '0' };
+        return { left: `${(position.offset + 1) * (100 / (position.count + 1))}%`, top: '-36px' };
       case 'bottom':
         return { left: `${(position.offset + 1) * (100 / (position.count + 1))}%`, bottom: '0' };
       case 'left':
@@ -170,6 +172,30 @@ export class Reproductor implements OnDestroy {
       default:
         return {};
     }
+  }
+
+  startLongPressTooltip(event: PointerEvent, edge: string, bookmark: BookmarkItem): void {
+    if (edge !== 'top') {
+      return;
+    }
+    const target = event.currentTarget as HTMLElement | null;
+    if (!target) {
+      return;
+    }
+    const text = this.bookmarkDenied(bookmark) ? `${bookmark.name} (sin permiso)` : bookmark.name;
+    const rect = target.getBoundingClientRect();
+    this.cancelLongPressTooltip();
+    this.longPressTimer = setTimeout(() => {
+      this.longPressTooltip.set({ text, x: rect.left + rect.width / 2, y: rect.top });
+    }, 500);
+  }
+
+  cancelLongPressTooltip(): void {
+    if (this.longPressTimer) {
+      clearTimeout(this.longPressTimer);
+      this.longPressTimer = null;
+    }
+    this.longPressTooltip.set(null);
   }
 
   isBookmarkSelected(index: number): boolean {
@@ -192,6 +218,7 @@ export class Reproductor implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.cancelLongPressTooltip();
     this.revokeCreatedUrls();
   }
 

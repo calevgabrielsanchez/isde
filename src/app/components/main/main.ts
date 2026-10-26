@@ -427,6 +427,7 @@ export class Main implements OnInit {
     if (!this.fileBrowserRef.onFileBrowserClick(current.path, bookmarkIndex)) {
       return;
     }
+    this.refreshStatus();
     const files = this.fileBrowser.entries().filter((entry) => entry.kind !== 'directory');
     const currentIndex = files.findIndex((entry) => entry.path === current.path);
     const nextEntry = currentIndex >= 0 ? files[currentIndex + 1] : undefined;
