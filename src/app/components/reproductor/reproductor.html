@@ -53,7 +53,17 @@
       @switch (mediaKind()) {
         @case ('image') {
           @if (mediaUrl(); as url) {
-            <img class="reproductor-media reproductor-image" [src]="url" alt="" />
+            <img
+              class="reproductor-media reproductor-image"
+              [src]="url"
+              alt=""
+              [style.transform]="'scale(' + imageZoom() + ')'"
+              [style.transform-origin]="imageZoomOrigin()"
+              (pointerdown)="onImagePointerDown($event)"
+              (pointermove)="onImagePointerMove($event)"
+              (pointerup)="onImagePointerEnd($event)"
+              (pointercancel)="onImagePointerEnd($event)"
+            />
           } @else if (isLoading()) {
             <fa-icon [icon]="faSpinner" class="reproductor-spinner reproductor-spin"></fa-icon>
           }

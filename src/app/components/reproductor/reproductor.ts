@@ -55,6 +55,8 @@ export class Reproductor implements OnDestroy {
   readonly renameError = signal<string | null>(null);
   readonly longPressTooltip = signal<{ text: string; x: number; y: number } | null>(null);
   private longPressTimer: ReturnType<typeof setTimeout> | null = null;
+  readonly imageZoom = signal(1);
+  readonly imageZoomOrigin = signal('50% 50%');
 
   readonly mediaUrl = signal<string | null>(null);
   readonly textContent = signal<string | null>(null);
@@ -113,9 +115,13 @@ export class Reproductor implements OnDestroy {
   private generation = 0;
   private createdUrls: string[] = [];
   private swipeStart: { x: number; y: number } | null = null;
+  private readonly imagePointers = new Map<number, { x: number; y: number }>();
+  private pinchStartDistance = 0;
+  private pinchStartZoom = 1;
+  private imagePinching = false;
 
   onSwipeStart(event: PointerEvent): void {
-    if (event.pointerType !== 'touch') {
+    if (event.pointerType !== 'touch' || this.imagePinching) {
       return;
     }
     this.swipeStart = { x: event.clientX, y: event.clientY };
@@ -124,7 +130,7 @@ export class Reproductor implements OnDestroy {
   onSwipeEnd(event: PointerEvent): void {
     const start = this.swipeStart;
     this.swipeStart = null;
-    if (!start || event.pointerType !== 'touch') {
+    if (!start || event.pointerType !== 'touch' || this.imagePinching) {
       return;
     }
 
@@ -151,6 +157,59 @@ export class Reproductor implements OnDestroy {
 
   cancelSwipe(): void {
     this.swipeStart = null;
+  }
+
+  onImagePointerDown(event: PointerEvent): void {
+    if (event.pointerType !== 'touch') {
+      return;
+    }
+    event.preventDefault();
+    const image = event.currentTarget as HTMLImageElement;
+    image.setPointerCapture(event.pointerId);
+    this.imagePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (this.imagePointers.size === 2) {
+      this.imagePinching = true;
+      this.swipeStart = null;
+      const [first, second] = [...this.imagePointers.values()];
+      this.pinchStartDistance = Math.max(this.pointerDistance(first, second), 1);
+      this.pinchStartZoom = this.imageZoom();
+      const rect = image.getBoundingClientRect();
+      const centerX = (first.x + second.x) / 2;
+      const centerY = (first.y + second.y) / 2;
+      const originX = Math.max(0, Math.min(100, ((centerX - rect.left) / rect.width) * 100));
+      const originY = Math.max(0, Math.min(100, ((centerY - rect.top) / rect.height) * 100));
+      this.imageZoomOrigin.set(`${originX}% ${originY}%`);
+    }
+  }
+
+  onImagePointerMove(event: PointerEvent): void {
+    if (!this.imagePointers.has(event.pointerId)) {
+      return;
+    }
+    this.imagePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (!this.imagePinching || this.imagePointers.size < 2) {
+      return;
+    }
+    event.preventDefault();
+    const [first, second] = [...this.imagePointers.values()];
+    const scale = this.pinchStartZoom * (this.pointerDistance(first, second) / this.pinchStartDistance);
+    const zoom = Math.max(1, Math.min(5, scale));
+    this.imageZoom.set(zoom);
+    if (zoom === 1) {
+      this.imageZoomOrigin.set('50% 50%');
+    }
+  }
+
+  onImagePointerEnd(event: PointerEvent): void {
+    this.imagePointers.delete(event.pointerId);
+    if (this.imagePointers.size === 0) {
+      this.imagePinching = false;
+      this.pinchStartDistance = 0;
+    }
+  }
+
+  private pointerDistance(first: { x: number; y: number }, second: { x: number; y: number }): number {
+    return Math.hypot(second.x - first.x, second.y - first.y);
   }
 
   navigateTo(entry: BrowserEntry | null): void {
@@ -224,6 +283,11 @@ export class Reproductor implements OnDestroy {
 
   private async loadMedia(entry: BrowserEntry | null): Promise<void> {
     const generation = ++this.generation;
+    this.imageZoom.set(1);
+    this.imageZoomOrigin.set('50% 50%');
+    this.imagePointers.clear();
+    this.imagePinching = false;
+    this.pinchStartDistance = 0;
     this.revokeCreatedUrls();
     this.mediaUrl.set(null);
     this.textContent.set(null);

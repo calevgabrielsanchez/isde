@@ -209,12 +209,14 @@ export class Main implements OnInit {
 
   // Estado para controlar si el menú está visible o no
   isMenuOpen: boolean = false;
+  readonly folderLoadComplete = signal(false);
   private fileBrowserScrollPosition = 0;
   private appContentScrollPosition = 0;
 
   // Método para alternar la visibilidad del menú
   toggleMenu(): void {
     if (!this.isMenuOpen) {
+      this.folderLoadComplete.set(false);
       this.fileBrowserScrollPosition = this.fileBrowserRef?.scrollPosition() ?? 0;
       this.appContentScrollPosition =
         document.querySelector<HTMLElement>('.app-content')?.scrollTop ?? 0;
@@ -234,6 +236,13 @@ export class Main implements OnInit {
   onFolderSelected(path: string): void {
     this.selectedPath = path;
     this.refreshStatus();
+  }
+
+  onFolderLoaded(): void {
+    this.folderLoadComplete.set(true);
+    if (this.isMenuOpen) {
+      this.toggleMenu();
+    }
   }
 
   onBookmarksChange(items: BookmarkItem[]): void {

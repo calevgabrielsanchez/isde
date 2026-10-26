@@ -191,6 +191,7 @@ export class Menu implements OnInit {
   readonly rootTreeUri = input<string | undefined>(undefined);
   readonly profileBookmarks = input<BookmarkItem[] | null>(null);
   readonly folderSelected = output<string>();
+  readonly folderLoaded = output<void>();
   readonly bookmarksChange = output<BookmarkItem[]>();
   readonly moveTriggered = output<void>();
   readonly grantAllAccess = output<void>();
@@ -581,6 +582,7 @@ export class Menu implements OnInit {
 
     await Preferences.set({ key: LAST_NATIVE_SOURCE_TREE_KEY, value: pickedPath });
     await this.loadNativeFolder(pickedPath);
+    this.folderLoaded.emit();
   }
 
   private async restoreLastNativeFolder(): Promise<void> {
@@ -643,6 +645,7 @@ export class Menu implements OnInit {
   private async listNativeDirectory(pickedPath: string): Promise<BrowserEntry[]> {
     if (pickedPath.startsWith('content://')) {
       const { files } = await FileTree.list({ treeUri: pickedPath });
+      this.notifyFileLimit(files.length);
       const entries: BrowserEntry[] = [];
       for (const file of files) {
         if (entries.length >= MAX_FILES) {
@@ -661,6 +664,7 @@ export class Menu implements OnInit {
     }
 
     const result = await Filesystem.readdir({ path: pickedPath });
+    this.notifyFileLimit(result.files.length);
     const entries: BrowserEntry[] = [];
     for (const file of result.files) {
       if (entries.length >= MAX_FILES) {
@@ -674,6 +678,7 @@ export class Menu implements OnInit {
   private async openNativeFileFallback(): Promise<void> {
     try {
       const result = await FilePicker.pickFiles();
+      this.notifyFileLimit(result.files.length);
       const selectableFiles = result.files.length > MAX_FILES ? result.files.slice(0, MAX_FILES) : result.files;
       for (const file of selectableFiles) {
         const name = file.name || this.nameFromPath(file.path || '');
@@ -782,6 +787,7 @@ export class Menu implements OnInit {
       this.folderSelected.emit(`/${dirHandle.name}`);
       this.browser.beginLoad(dirHandle.name);
       await this.scanWebDirectory(dirHandle);
+      this.folderLoaded.emit();
     } catch (error) {
       const reason = error as { name?: string } | null;
       if (!reason || reason.name !== 'AbortError') {
@@ -793,6 +799,7 @@ export class Menu implements OnInit {
   private async scanWebDirectory(dirHandle: FileSystemDirectoryHandle): Promise<void> {
     for await (const entry of dirHandle.values()) {
       if (this.browser.entries().length >= MAX_FILES) {
+        this.notifyFileLimit(MAX_FILES + 1);
         break;
       }
       if (entry.kind === 'directory') {
@@ -844,6 +851,7 @@ export class Menu implements OnInit {
     input.onchange = async () => {
       const files = input.files;
       if (files && files.length > 0) {
+        this.notifyFileLimit(files.length);
         const firstFile = files[0] as File & { webkitRelativePath?: string };
         const folderName = firstFile.webkitRelativePath?.split('/')[0] ?? firstFile.name;
         this.folderSelected.emit(`/${folderName}`);
@@ -867,6 +875,7 @@ export class Menu implements OnInit {
           }]);
         }
         this.browser.finishLoad();
+        this.folderLoaded.emit();
       }
       input.remove();
     };
@@ -877,6 +886,12 @@ export class Menu implements OnInit {
 
   private nameFromPath(path: string): string {
     return decodeURIComponent(path.replace(/\/+$/, '')).split('/').pop() ?? path;
+  }
+
+  private notifyFileLimit(totalFiles: number): void {
+    if (totalFiles > MAX_FILES) {
+      window.alert(`Por cuestiones de memoria, solo se cargarán los primeros ${MAX_FILES} archivos.`);
+    }
   }
 
   private folderNameFromFileInputValue(value: string): string {

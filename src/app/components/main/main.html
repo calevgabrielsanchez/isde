@@ -26,12 +26,13 @@
     <!-- Área principal de contenido -->
     <main class="app-content">
       <app-menu
-        [class.menu-hidden]="!isMenuOpen"
+        [class.menu-hidden]="!isMenuOpen || folderLoadComplete()"
         [selectedPath]="selectedPath"
         [permissionMap]="permissionMap()"
         [rootTreeUri]="rootTreeUri()"
         [profileBookmarks]="profileBookmarks"
         (folderSelected)="onFolderSelected($event)"
+        (folderLoaded)="onFolderLoaded()"
         (bookmarksChange)="onBookmarksChange($event)"
         (moveTriggered)="onMoveTriggered()"
         (grantAllAccess)="onGrantAllAccess()"></app-menu>

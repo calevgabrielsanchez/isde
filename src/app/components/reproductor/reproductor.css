@@ -139,6 +139,8 @@
 
 .reproductor-image {
   object-fit: contain;
+  touch-action: none;
+  user-select: none;
 }
 
 .reproductor-spinner {
