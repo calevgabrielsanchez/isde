@@ -35,6 +35,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 
 @CapacitorPlugin(name = "FileTree")
 public class FileTreePlugin extends Plugin {
@@ -49,9 +50,12 @@ public class FileTreePlugin extends Plugin {
 
         try {
             Uri treeUri = Uri.parse(treeUriString);
-            String treeDocId = DocumentsContract.getTreeDocumentId(treeUri);
-            Uri rootDocUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, treeDocId);
-            Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(rootDocUri, treeDocId);
+            String parentUriString = call.getString("parentUri");
+            Uri parentUri = parentUriString == null ? treeUri : Uri.parse(parentUriString);
+            String parentDocId = parentUriString == null
+                ? DocumentsContract.getTreeDocumentId(treeUri)
+                : DocumentsContract.getDocumentId(parentUri);
+            Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId);
 
             JSArray result = new JSArray();
             ContentResolver resolver = getContext().getContentResolver();
@@ -62,6 +66,7 @@ public class FileTreePlugin extends Plugin {
                     DocumentsContract.Document.COLUMN_DISPLAY_NAME,
                     DocumentsContract.Document.COLUMN_MIME_TYPE,
                     DocumentsContract.Document.COLUMN_SIZE,
+                    DocumentsContract.Document.COLUMN_LAST_MODIFIED,
                 },
                 null,
                 null,
@@ -73,6 +78,7 @@ public class FileTreePlugin extends Plugin {
                     int nameIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME);
                     int mimeIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE);
                     int sizeIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_SIZE);
+                    int modifiedIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED);
                     while (cursor.moveToNext()) {
                         String docId = cursor.getString(idIndex);
                         String displayName = cursor.getString(nameIndex);
@@ -86,6 +92,9 @@ public class FileTreePlugin extends Plugin {
                         entry.put("isDirectory", DocumentsContract.Document.MIME_TYPE_DIR.equals(mimeType));
                         entry.put("mimeType", mimeType);
                         entry.put("size", size);
+                        if (modifiedIndex >= 0 && !cursor.isNull(modifiedIndex)) {
+                            entry.put("lastModified", cursor.getLong(modifiedIndex));
+                        }
                         result.put(entry);
                     }
                 } finally {
@@ -96,6 +105,115 @@ public class FileTreePlugin extends Plugin {
         } catch (Exception error) {
             call.reject("No se pudo listar el directorio: " + error.getMessage(), error);
         }
+    }
+
+    @PluginMethod
+    public void hash(PluginCall call) {
+        String uriString = call.getString("uri");
+        if (uriString == null || uriString.isEmpty()) { call.reject("uri es requerido"); return; }
+        try (InputStream input = getContext().getContentResolver().openInputStream(Uri.parse(uriString))) {
+            if (input == null) throw new Exception("No se pudo abrir el archivo");
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] buffer = new byte[65536];
+            int count;
+            while ((count = input.read(buffer)) != -1) digest.update(buffer, 0, count);
+            StringBuilder hex = new StringBuilder();
+            for (byte value : digest.digest()) hex.append(String.format("%02x", value & 0xff));
+            call.resolve(new JSObject().put("sha256", hex.toString()));
+        } catch (Exception error) { call.reject("No se pudo verificar el contenido: " + error.getMessage(), error); }
+    }
+
+    @PluginMethod
+    public void delete(PluginCall call) {
+        String uriString = call.getString("uri");
+        try {
+            if (uriString == null || !DocumentsContract.deleteDocument(getContext().getContentResolver(), Uri.parse(uriString))) {
+                throw new Exception("El proveedor no permitió eliminar el archivo");
+            }
+            call.resolve();
+        } catch (Exception error) { call.reject("No se pudo eliminar el archivo: " + error.getMessage(), error); }
+    }
+
+    @PluginMethod
+    public void rename(PluginCall call) {
+        String uriString = call.getString("uri");
+        String name = call.getString("name");
+        try {
+            if (uriString == null || name == null || name.trim().isEmpty()) throw new Exception("Nombre no válido");
+            Uri renamed = DocumentsContract.renameDocument(getContext().getContentResolver(), Uri.parse(uriString), name.trim());
+            if (renamed == null) throw new Exception("El proveedor no permitió renombrar el archivo");
+            call.resolve(new JSObject().put("uri", renamed.toString()));
+        } catch (Exception error) { call.reject("No se pudo renombrar el archivo: " + error.getMessage(), error); }
+    }
+
+    @PluginMethod
+    public void copy(PluginCall call) {
+        String sourceString = call.getString("sourceUri");
+        String treeString = call.getString("destTreeUri");
+        String relativePath = call.getString("destRelativePath");
+        try {
+            if (sourceString == null || treeString == null || relativePath == null || relativePath.trim().isEmpty()) {
+                throw new Exception("Faltan datos para copiar el archivo");
+            }
+            ContentResolver resolver = getContext().getContentResolver();
+            Uri treeUri = Uri.parse(treeString);
+            String treeDocId = DocumentsContract.getTreeDocumentId(treeUri);
+            Uri parentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, treeDocId);
+            String[] parts = relativePath.replace('\\', '/').split("/");
+            for (int i = 0; i < parts.length - 1; i++) {
+                if (parts[i].isEmpty() || ".".equals(parts[i]) || "..".equals(parts[i])) continue;
+                Uri next = findChild(parentUri, parts[i], true);
+                parentUri = next;
+            }
+            String fileName = parts[parts.length - 1];
+            if (fileName.isEmpty() || ".".equals(fileName) || "..".equals(fileName)) throw new Exception("Nombre de destino no válido");
+            Uri existing = findChild(parentUri, fileName, false);
+            if (existing != null) {
+                if (DocumentsContract.Document.MIME_TYPE_DIR.equals(resolver.getType(existing))) {
+                    throw new Exception("Ya existe una carpeta con el nombre " + fileName);
+                }
+                DocumentsContract.deleteDocument(resolver, existing);
+            }
+            String mimeType = resolver.getType(Uri.parse(sourceString));
+            Uri created = DocumentsContract.createDocument(resolver, parentUri, mimeType == null ? "application/octet-stream" : mimeType, fileName);
+            if (created == null) throw new Exception("No se pudo crear el archivo en el destino");
+            try (InputStream input = resolver.openInputStream(Uri.parse(sourceString));
+                 OutputStream output = resolver.openOutputStream(created, "wt")) {
+                if (input == null || output == null) throw new Exception("No se pudo abrir el archivo para copiarlo");
+                byte[] buffer = new byte[65536];
+                int count;
+                while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+                output.flush();
+            }
+            call.resolve();
+        } catch (Exception error) { call.reject("No se pudo copiar el archivo: " + error.getMessage(), error); }
+    }
+
+    private Uri findChild(Uri parentUri, String name, boolean createDirectory) throws Exception {
+        String documentId = DocumentsContract.getDocumentId(parentUri);
+        Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(parentUri, documentId);
+        try (Cursor cursor = getContext().getContentResolver().query(childrenUri,
+            new String[] { DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_MIME_TYPE }, null, null, null)) {
+            if (cursor != null) {
+                int idIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID);
+                int nameIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME);
+                int mimeIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE);
+                while (cursor.moveToNext()) {
+                    if (name.equals(cursor.getString(nameIndex))) {
+                        boolean isDirectory = DocumentsContract.Document.MIME_TYPE_DIR.equals(cursor.getString(mimeIndex));
+                        if (isDirectory || !createDirectory) return DocumentsContract.buildDocumentUriUsingTree(parentUri, cursor.getString(idIndex));
+                    }
+                }
+            }
+        }
+        if (createDirectory) {
+            Uri created = DocumentsContract.createDocument(getContext().getContentResolver(), parentUri,
+                DocumentsContract.Document.MIME_TYPE_DIR, name);
+            if (created != null) return created;
+        }
+        if (createDirectory) throw new Exception("No se pudo crear la carpeta " + name);
+        return null;
     }
 
     @PluginMethod

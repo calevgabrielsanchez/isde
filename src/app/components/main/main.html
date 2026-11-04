@@ -1,5 +1,9 @@
 <div class="app-viewport">
   <div class="app-container">
+    <span class="corner-screw screw-top-left" aria-hidden="true"></span>
+  <span class="corner-screw screw-top-right" aria-hidden="true"></span>
+  <span class="corner-screw screw-bottom-left" aria-hidden="true"></span>
+  <span class="corner-screw screw-bottom-right" aria-hidden="true"></span>
     <!-- Cabecera de la aplicación -->
     <header class="app-header">
       <button type="button" class="header-section" (click)="toggleMenu()" aria-label="Abrir menú">
@@ -35,7 +39,8 @@
         (folderLoaded)="onFolderLoaded()"
         (bookmarksChange)="onBookmarksChange($event)"
         (moveTriggered)="onMoveTriggered()"
-        (grantAllAccess)="onGrantAllAccess()"></app-menu>
+        (grantAllAccess)="onGrantAllAccess()"
+        (duplicateView)="onOpenMedia($event)"></app-menu>
         @if (fileBrowser.folderName() !== null || fileBrowser.loading() || fileBrowser.error()) {
           <app-file-browser #fileBrowserRef [class.fb-hidden]="isMenuOpen" [bookmarks]="bookmarks()" [bookmarksByProfile]="profileBookmarksMap" [activeProfileId]="activeProfileId" [permissionMap]="permissionMap()" (click)="onFileBrowserClick()" (openMedia)="onOpenMedia($event)"></app-file-browser>
         }
@@ -71,7 +76,9 @@
       } @else {
         <span class="app-footer-hint">Toca el marcador en un archivo para elegir su destino.</span>
       }
+      
     </footer>
+    <footer class="app-footer-creality"><span>CrealitySolution.com</span><span class="footer-vents" aria-hidden="true"></span><span>{{ version }}</span></footer>
   </div>
 
   @if (mediaEntry(); as entry) {

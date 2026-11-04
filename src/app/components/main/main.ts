@@ -28,6 +28,8 @@ export class Main implements OnInit {
   faGlobe = faGlobe;
   faCoffee = faCoffee;
 
+
+  version = '1.0.0'; // Versión de la aplicación (se muestra en el footer)
   // Modos del botón de perfil (cada botón del header selecciona su perfil directo)
   profileModes = [
     { id: 'archivos', icon: faFolderOpen, label: 'Archivos' },

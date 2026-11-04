@@ -104,4 +104,110 @@
       Mover
     </button>
   </div>
+
+  <!-- BBuscar Duplicados -->
+  <div class="action-row">
+    <button class="btn-mover" (click)="onSearchDuplicates()">
+      Buscar Duplicados
+    </button>
+  </div>
+
+  <!-- Sincronización de carpetas -->
+  <div class="action-row">
+    <button class="btn-mover" (click)="onSyncFolders()">
+      Sincronizar Carpetas
+    </button>
+  </div>
+
+  @if (duplicateDialogOpen()) {
+    <div class="duplicates-backdrop" role="presentation" (click)="closeDuplicateDialog()">
+      <section class="duplicates-dialog" role="dialog" aria-modal="true" aria-labelledby="duplicates-title" (click)="$event.stopPropagation()">
+        <header class="duplicates-header">
+          <h2 id="duplicates-title">Archivos duplicados</h2>
+          <button type="button" class="duplicates-close" aria-label="Cerrar" (click)="closeDuplicateDialog()">×</button>
+        </header>
+        <p class="duplicates-note">Se comparó el contenido completo (SHA-256); nombre, tamaño y fecha de modificación son datos auxiliares. La fecha de creación no está disponible en todos los sistemas.</p>
+        @if (duplicateLoading()) {
+          <p class="duplicates-message">Revisando archivos y subdirectorios…</p>
+        } @else if (duplicateError()) {
+          <p class="duplicates-error">{{ duplicateError() }}</p>
+        } @else if (duplicateGroups().length === 0) {
+          <p class="duplicates-message">No se encontraron archivos duplicados.</p>
+        } @else {
+          <p class="duplicates-message">{{ duplicateGroups().length }} grupo(s) de archivos idénticos.</p>
+          <div class="duplicates-list">
+            @for (group of duplicateGroups(); track $index) {
+              <article class="duplicate-group">
+                <h3>Grupo {{ $index + 1 }} · {{ group[0].size | number }} bytes</h3>
+                @for (file of group; track file.path) {
+                  <div class="duplicate-file">
+                    <div class="duplicate-info">
+                      <strong>{{ file.name }}</strong>
+                      <small>{{ file.path }}</small>
+                      <small>{{ file.lastModified ? (file.lastModified | date:'medium') : 'Fecha no disponible' }}</small>
+                    </div>
+                    <div class="duplicate-actions">
+                      <button type="button" (click)="viewDuplicate(file)">Visualizar</button>
+                      <button type="button" (click)="deleteDuplicate(file)">Eliminar</button>
+                      <button type="button" (click)="renameDuplicate(file)">Renombrar</button>
+                      <button type="button" [class.duplicate-kept]="isDuplicateKept(file.path)" (click)="keepDuplicate(file)">{{ isDuplicateKept(file.path) ? 'Conservado' : 'Conservar' }}</button>
+                    </div>
+                  </div>
+                }
+              </article>
+            }
+          </div>
+        }
+      </section>
+    </div>
+  }
+
+  @if (syncDialogOpen()) {
+    <div class="duplicates-backdrop" role="presentation" (click)="closeSyncDialog()">
+      <section class="duplicates-dialog sync-dialog" role="dialog" aria-modal="true" aria-labelledby="sync-title" (click)="$event.stopPropagation()">
+        <header class="duplicates-header">
+          <h2 id="sync-title">Sincronizar carpetas</h2>
+          <button type="button" class="duplicates-close" aria-label="Cerrar" (click)="closeSyncDialog()">×</button>
+        </header>
+        <p class="duplicates-note">Esta aplicación compara la carpeta abierta con la segunda carpeta seleccionada, incluyendo subdirectorios. Los archivos se verifican por contenido (SHA-256).</p>
+        @if (syncBusy()) {
+          <p class="duplicates-message">Comparando o copiando archivos…</p>
+        } @else if (syncError()) {
+          <p class="duplicates-error">{{ syncError() }}</p>
+        } @else if (syncDifferences().length === 0) {
+          <p class="duplicates-message">Las carpetas están sincronizadas; no se encontraron archivos faltantes ni modificados.</p>
+        } @else {
+          <p class="duplicates-message">{{ syncDifferences().length }} archivo(s) faltante(s) o modificado(s).</p>
+          <div class="sync-all-actions">
+            <button type="button" (click)="syncAll('bring')">Traer todo</button>
+            <button type="button" (click)="syncAll('send')">Enviar todo</button>
+          </div>
+          <div class="duplicates-list">
+            @for (item of syncDifferences(); track item.path) {
+              <article class="duplicate-group sync-item">
+                <div class="duplicate-info">
+                  <strong>{{ item.path }}</strong>
+                  <small>{{ item.kind === 'missing-local' ? 'Solo existe en la otra carpeta' : item.kind === 'missing-peer' ? 'Solo existe en esta carpeta' : 'El contenido fue modificado en ambas carpetas' }}</small>
+                  @if (item.local) { <small>Esta carpeta: {{ item.local.size | number }} bytes · {{ item.local.lastModified ? (item.local.lastModified | date:'medium') : 'fecha desconocida' }}</small> }
+                  @if (item.peer) { <small>Otra carpeta: {{ item.peer.size | number }} bytes · {{ item.peer.lastModified ? (item.peer.lastModified | date:'medium') : 'fecha desconocida' }}</small> }
+                </div>
+                <div class="duplicate-actions">
+                  @if (item.peer) { <button type="button" (click)="syncOne(item, 'bring')">Traer</button> }
+                  @if (item.local) { <button type="button" (click)="syncOne(item, 'send')">Enviar</button> }
+                  @if (item.local; as localFile) {
+                    <button type="button" (click)="viewSyncFile(localFile)">Ver esta</button>
+                    <button type="button" (click)="deleteSyncFile(item, 'local')">Eliminar esta</button>
+                  }
+                  @if (item.peer; as peerFile) {
+                    <button type="button" (click)="viewSyncFile(peerFile)">Ver otra</button>
+                    <button type="button" (click)="deleteSyncFile(item, 'peer')">Eliminar otra</button>
+                  }
+                </div>
+              </article>
+            }
+          </div>
+        }
+      </section>
+    </div>
+  }
 </div>

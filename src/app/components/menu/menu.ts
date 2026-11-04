@@ -148,6 +148,36 @@ export interface BookmarkItem {
   treePath?: string;
 }
 
+interface DuplicateFile {
+  name: string;
+  path: string;
+  size: number;
+  lastModified?: number;
+  sha256: string;
+  handle?: FileSystemFileHandle;
+  parentHandle?: FileSystemDirectoryHandle;
+  file?: File;
+}
+
+interface SyncFile {
+  name: string;
+  path: string;
+  size: number;
+  lastModified?: number;
+  sha256: string;
+  uri?: string;
+  handle?: FileSystemFileHandle;
+  parentHandle?: FileSystemDirectoryHandle;
+  file?: File;
+}
+
+interface SyncDifference {
+  path: string;
+  kind: 'missing-local' | 'missing-peer' | 'modified';
+  local?: SyncFile;
+  peer?: SyncFile;
+}
+
 @Component({
   imports: [CommonModule, FontAwesomeModule],
   standalone: true,
@@ -215,6 +245,19 @@ export class Menu implements OnInit {
   selectedBookmarkIndex = signal<number>(0);
   selectedDirectory = signal<FileSystemDirectoryHandle | null>(null);
   selectedFolderPath = signal<string | null>(null);
+  selectedTreeUri = signal<string | null>(null);
+  readonly duplicateGroups = signal<DuplicateFile[][]>([]);
+  readonly duplicateLoading = signal(false);
+  readonly duplicateError = signal<string | null>(null);
+  readonly duplicateDialogOpen = signal(false);
+  readonly keptDuplicatePaths = signal<Set<string>>(new Set());
+  readonly duplicateView = output<BrowserEntry>();
+  readonly syncDialogOpen = signal(false);
+  readonly syncBusy = signal(false);
+  readonly syncError = signal<string | null>(null);
+  readonly syncDifferences = signal<SyncDifference[]>([]);
+  private peerDirectory: FileSystemDirectoryHandle | null = null;
+  private peerTreeUri: string | null = null;
   selectedPathAddBookMark = signal<string>('');
   pendingBookmarkTree = signal<{ treeUri?: string; treePath?: string }>({});
 
@@ -466,6 +509,347 @@ export class Menu implements OnInit {
     void this.openWebFolder();
   }
 
+  async onSearchDuplicates(): Promise<void> {
+    this.duplicateError.set(null);
+    this.duplicateGroups.set([]);
+    this.keptDuplicatePaths.set(new Set());
+    this.duplicateDialogOpen.set(true);
+    this.duplicateLoading.set(true);
+    try {
+      const candidates: Omit<DuplicateFile, 'sha256'>[] = [];
+      const webRoot = this.selectedDirectory();
+      const treeUri = this.selectedTreeUri();
+      if (webRoot) {
+        await this.collectWebFiles(webRoot, candidates, webRoot.name);
+      } else if (treeUri) {
+        await this.collectNativeFiles(treeUri, undefined, candidates);
+      } else {
+        for (const entry of this.browser.entries()) {
+          if (entry.kind === 'file' && entry.file) {
+            candidates.push({ name: entry.name, path: entry.path, size: entry.file.size, lastModified: entry.file.lastModified, file: entry.file });
+          } else if (entry.kind === 'file' && entry.handle) {
+            const file = await (entry.handle as FileSystemFileHandle).getFile();
+            candidates.push({ name: entry.name, path: entry.path, size: file.size, lastModified: file.lastModified, file, handle: entry.handle as FileSystemFileHandle });
+          }
+        }
+      }
+      if (!webRoot && !treeUri && candidates.length === 0) {
+        throw new Error('Abre una carpeta antes de buscar duplicados.');
+      }
+
+      const hashed: DuplicateFile[] = [];
+      for (let index = 0; index < candidates.length; index++) {
+        const item = candidates[index];
+        try {
+          const sha256 = treeUri
+            ? (await FileTree.hash({ uri: item.path })).sha256
+            : await this.hashWebFile(item.file ?? await item.handle!.getFile());
+          hashed.push({ ...item, sha256 });
+        } catch (error) {
+          console.warn(`No se pudo verificar ${item.path}`, error);
+        }
+      }
+      const groups = new Map<string, DuplicateFile[]>();
+      for (const item of hashed) {
+        const current = groups.get(item.sha256) ?? [];
+        current.push(item);
+        groups.set(item.sha256, current);
+      }
+      this.duplicateGroups.set([...groups.values()].filter((group) => group.length > 1));
+    } catch (error) {
+      this.duplicateError.set(error instanceof Error ? error.message : String(error));
+    } finally {
+      this.duplicateLoading.set(false);
+    }
+  }
+
+  closeDuplicateDialog(): void {
+    this.duplicateDialogOpen.set(false);
+  }
+
+  async deleteDuplicate(file: DuplicateFile): Promise<void> {
+    if (!window.confirm(`¿Eliminar definitivamente “${file.name}”?`)) return;
+    try {
+      await this.removeDuplicateFile(file);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async renameDuplicate(file: DuplicateFile): Promise<void> {
+    const name = window.prompt('Nuevo nombre del archivo:', file.name)?.trim();
+    if (!name || name === file.name) return;
+    try {
+      let newPath = file.path;
+      if (file.path.startsWith('content://')) {
+        const result = await FileTree.rename({ uri: file.path, name });
+        this.browser.renameEntry(file.path, name, result.uri);
+        newPath = result.uri;
+      } else if (file.handle) {
+        await (file.handle as FileSystemFileHandle & { move(name: string): Promise<void> }).move(name);
+        const parent = file.path.includes('/') ? file.path.slice(0, file.path.lastIndexOf('/') + 1) : '';
+        newPath = `${parent}${name}`;
+        this.browser.renameEntry(file.path, name, newPath);
+      } else {
+        throw new Error('No se puede renombrar este archivo desde el navegador.');
+      }
+      const renamed = { ...file, name, path: newPath };
+      this.duplicateGroups.update((groups) => groups.map((group) => group.map((item) => item === file ? renamed : item)));
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  refreshDuplicateGroups(removed: DuplicateFile): void {
+    this.duplicateGroups.update((groups) => groups.map((group) => group.filter((item) => item !== removed)).filter((group) => group.length > 1));
+  }
+
+  async keepDuplicate(file: DuplicateFile): Promise<void> {
+    const group = this.duplicateGroups().find((items) => items.some((item) => item.path === file.path));
+    if (!group) return;
+    const others = group.filter((item) => item.path !== file.path);
+    if (!window.confirm(`Se conservará “${file.name}” y se eliminarán los otros ${others.length} duplicado(s). ¿Continuar?`)) return;
+    const failures: string[] = [];
+    for (const duplicate of others) {
+      try {
+        await this.removeDuplicateFile(duplicate);
+      } catch (error) {
+        failures.push(`${duplicate.name}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    this.keptDuplicatePaths.update((current) => new Set(current).add(file.path));
+    if (failures.length) window.alert(`Se conservará “${file.name}”, pero no se pudieron eliminar todos los duplicados:\n${failures.join('\n')}`);
+  }
+
+  isDuplicateKept(path: string): boolean {
+    return this.keptDuplicatePaths().has(path);
+  }
+
+  async onSyncFolders(): Promise<void> {
+    this.syncError.set(null);
+    this.syncDifferences.set([]);
+    this.syncDialogOpen.set(true);
+    this.syncBusy.set(true);
+    try {
+      if (!this.selectedDirectory() && !this.selectedTreeUri()) {
+        throw new Error('Primero abre en esta aplicación la carpeta que quieres sincronizar.');
+      }
+      if (this.isNative) {
+        const { treeUri } = await FileTree.pickTree({});
+        this.peerTreeUri = treeUri;
+        this.peerDirectory = null;
+      } else {
+        const picker = window as Window & { showDirectoryPicker?: (options?: { mode?: 'read' | 'readwrite' }) => Promise<FileSystemDirectoryHandle> };
+        if (!picker.showDirectoryPicker) throw new Error('Este navegador no permite seleccionar una segunda carpeta para sincronizar.');
+        this.peerDirectory = await picker.showDirectoryPicker({ mode: 'readwrite' });
+        this.peerTreeUri = null;
+      }
+      const [localFiles, peerFiles] = await Promise.all([this.scanSyncSide(false), this.scanSyncSide(true)]);
+      const localByPath = new Map(localFiles.map((file) => [file.path, file]));
+      const peerByPath = new Map(peerFiles.map((file) => [file.path, file]));
+      const paths = new Set([...localByPath.keys(), ...peerByPath.keys()]);
+      const differences: SyncDifference[] = [];
+      for (const path of paths) {
+        const local = localByPath.get(path);
+        const peer = peerByPath.get(path);
+        if (!local) differences.push({ path, kind: 'missing-local', peer });
+        else if (!peer) differences.push({ path, kind: 'missing-peer', local });
+        else if (local.sha256 !== peer.sha256) differences.push({ path, kind: 'modified', local, peer });
+      }
+      this.syncDifferences.set(differences);
+    } catch (error) {
+      const reason = error as { name?: string; message?: string };
+      if (reason?.name === 'AbortError' || reason?.message?.includes('canceled')) {
+        this.syncDialogOpen.set(false);
+      } else {
+        this.syncError.set(reason?.message || String(error));
+      }
+    } finally {
+      this.syncBusy.set(false);
+    }
+  }
+
+  closeSyncDialog(): void {
+    this.syncDialogOpen.set(false);
+  }
+
+  async syncOne(difference: SyncDifference, direction: 'bring' | 'send'): Promise<void> {
+    if (this.syncBusy()) return;
+    this.syncBusy.set(true);
+    try {
+      await this.transferSyncFile(difference, direction);
+      this.syncDifferences.update((items) => items.filter((item) => item !== difference));
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : String(error));
+    } finally {
+      this.syncBusy.set(false);
+    }
+  }
+
+  viewSyncFile(file: SyncFile): void {
+    this.duplicateView.emit({
+      name: file.name,
+      path: file.uri ?? file.path,
+      kind: 'file',
+      size: file.size,
+      isImage: IMAGE_EXTENSION.test(file.name),
+      thumb: undefined,
+      ...(file.handle ? { handle: file.handle } : {}),
+      ...(file.file ? { file: file.file } : {}),
+    });
+  }
+
+  async deleteSyncFile(difference: SyncDifference, side: 'local' | 'peer'): Promise<void> {
+    const file = side === 'local' ? difference.local : difference.peer;
+    if (!file || this.syncBusy()) return;
+    if (!window.confirm(`¿Eliminar “${difference.path}” de ${side === 'local' ? 'esta carpeta' : 'la otra carpeta'}?`)) return;
+    this.syncBusy.set(true);
+    try {
+      if (file.uri) await FileTree.delete({ uri: file.uri });
+      else if (file.parentHandle) await file.parentHandle.removeEntry(file.name);
+      else throw new Error('No se pudo eliminar el archivo en este tipo de almacenamiento.');
+      this.syncDifferences.update((items) => items.flatMap((item) => {
+        if (item !== difference) return [item];
+        const updated: SyncDifference = { ...item, [side]: undefined };
+        if (!updated.local && !updated.peer) return [];
+        updated.kind = updated.local ? 'missing-peer' : 'missing-local';
+        return [updated];
+      }));
+      this.browser.removeEntry(file.uri ?? file.path);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : String(error));
+    } finally {
+      this.syncBusy.set(false);
+    }
+  }
+
+  async syncAll(direction: 'bring' | 'send'): Promise<void> {
+    if (this.syncBusy()) return;
+    const applicable = this.syncDifferences().filter((item) => direction === 'bring' ? !!item.peer : !!item.local);
+    if (!applicable.length) return;
+    const label = direction === 'bring' ? 'traer a esta carpeta' : 'enviar a la otra carpeta';
+    if (!window.confirm(`Se copiarán ${applicable.length} archivo(s) para ${label}. En caso de conflicto, se reemplazará la versión del destino. ¿Continuar?`)) return;
+    this.syncBusy.set(true);
+    const failed = new Set<SyncDifference>();
+    for (const item of applicable) {
+      try { await this.transferSyncFile(item, direction); }
+      catch (error) { failed.add(item); console.error('Error al sincronizar', item.path, error); }
+    }
+    this.syncDifferences.update((items) => items.filter((item) => failed.has(item)));
+    this.syncBusy.set(false);
+    if (failed.size) window.alert(`No se pudieron sincronizar ${failed.size} archivo(s). Revisa la consola para más información.`);
+  }
+
+  private async scanSyncSide(peer: boolean): Promise<SyncFile[]> {
+    const treeUri = peer ? this.peerTreeUri : this.selectedTreeUri();
+    if (treeUri) {
+      const files: SyncFile[] = [];
+      await this.collectSyncNative(treeUri, undefined, '', files);
+      return files;
+    }
+    const root = peer ? this.peerDirectory : this.selectedDirectory();
+    if (!root) throw new Error('No se pudo acceder a una de las carpetas seleccionadas.');
+    const files: SyncFile[] = [];
+    await this.collectSyncWeb(root, '', files);
+    return files;
+  }
+
+  private async collectSyncNative(treeUri: string, parentUri: string | undefined, relative: string, output: SyncFile[]): Promise<void> {
+    const { files } = await FileTree.list({ treeUri, ...(parentUri ? { parentUri } : {}) });
+    for (const entry of files) {
+      const path = relative ? `${relative}/${entry.name}` : entry.name;
+      if (entry.isDirectory) await this.collectSyncNative(treeUri, entry.uri, path, output);
+      else {
+        const { sha256 } = await FileTree.hash({ uri: entry.uri });
+        output.push({ name: entry.name, path, size: entry.size, lastModified: entry.lastModified, sha256, uri: entry.uri });
+      }
+    }
+  }
+
+  private async collectSyncWeb(directory: FileSystemDirectoryHandle, relative: string, output: SyncFile[]): Promise<void> {
+    for await (const entry of directory.values()) {
+      const path = relative ? `${relative}/${entry.name}` : entry.name;
+      if (entry.kind === 'directory') await this.collectSyncWeb(entry as FileSystemDirectoryHandle, path, output);
+      else {
+        const handle = entry as FileSystemFileHandle;
+        const file = await handle.getFile();
+        output.push({ name: entry.name, path, size: file.size, lastModified: file.lastModified, sha256: await this.hashWebFile(file), handle, parentHandle: directory, file });
+      }
+    }
+  }
+
+  private async transferSyncFile(difference: SyncDifference, direction: 'bring' | 'send'): Promise<void> {
+    const source = direction === 'bring' ? difference.peer : difference.local;
+    const destinationTree = direction === 'bring' ? this.selectedTreeUri() : this.peerTreeUri;
+    const destinationDirectory = direction === 'bring' ? this.selectedDirectory() : this.peerDirectory;
+    if (!source) throw new Error('No se encontró el archivo de origen.');
+    if (source.uri && destinationTree) {
+      await FileTree.copy({ sourceUri: source.uri, destTreeUri: destinationTree, destRelativePath: source.path });
+    } else if (source.file && destinationDirectory) {
+      await this.writeSyncFile(destinationDirectory, source.path, source.file);
+    } else {
+      throw new Error('No se pueden copiar archivos entre estos tipos de almacenamiento.');
+    }
+  }
+
+  private async writeSyncFile(root: FileSystemDirectoryHandle, path: string, file: File): Promise<void> {
+    const segments = path.split('/').filter(Boolean);
+    const name = segments.pop();
+    if (!name) throw new Error('Ruta de archivo no válida.');
+    let directory = root;
+    for (const segment of segments) directory = await directory.getDirectoryHandle(segment, { create: true });
+    const handle = await directory.getFileHandle(name, { create: true });
+    const writable = await handle.createWritable();
+    await writable.write(file);
+    await writable.close();
+  }
+
+  viewDuplicate(file: DuplicateFile): void {
+    this.duplicateView.emit({
+      name: file.name,
+      path: file.path,
+      kind: 'file',
+      size: file.size,
+      isImage: IMAGE_EXTENSION.test(file.name),
+      thumb: undefined,
+      ...(file.handle ? { handle: file.handle } : {}),
+      ...(file.file ? { file: file.file } : {}),
+    });
+  }
+
+  private async removeDuplicateFile(file: DuplicateFile): Promise<void> {
+    if (file.path.startsWith('content://')) await FileTree.delete({ uri: file.path });
+    else if (file.parentHandle) await file.parentHandle.removeEntry(file.name);
+    else if (file.file && Capacitor.isNativePlatform()) await Filesystem.deleteFile({ path: file.path });
+    else throw new Error('Este navegador no permite eliminar archivos de la carpeta seleccionada.');
+    this.browser.removeEntry(file.path);
+    this.refreshDuplicateGroups(file);
+  }
+
+  private async hashWebFile(file: File): Promise<string> {
+    const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+    return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, '0')).join('');
+  }
+
+  private async collectWebFiles(directory: FileSystemDirectoryHandle, output: Omit<DuplicateFile, 'sha256'>[], relativePath: string): Promise<void> {
+    for await (const entry of directory.values()) {
+      if (entry.kind === 'directory') await this.collectWebFiles(entry as FileSystemDirectoryHandle, output, `${relativePath}/${entry.name}`);
+      else {
+        const handle = entry as FileSystemFileHandle;
+        const file = await handle.getFile();
+        output.push({ name: entry.name, path: `${relativePath}/${entry.name}`, size: file.size, lastModified: file.lastModified, handle, parentHandle: directory, file });
+      }
+    }
+  }
+
+  private async collectNativeFiles(treeUri: string, parentUri: string | undefined, output: Omit<DuplicateFile, 'sha256'>[]): Promise<void> {
+    const { files } = await FileTree.list({ treeUri, ...(parentUri ? { parentUri } : {}) });
+    for (const entry of files) {
+      if (entry.isDirectory) await this.collectNativeFiles(treeUri, entry.uri, output);
+      else output.push({ name: entry.name, path: entry.uri, size: entry.size, lastModified: entry.lastModified });
+    }
+  }
+
   private async pickFolderPath(): Promise<PickedFolder | null> {
     if (Capacitor.isNativePlatform()) {
       try {
@@ -608,6 +992,7 @@ export class Menu implements OnInit {
     console.log('Nombre de la carpeta:', folderName);
     this.browser.setSourceDirectory(null);
     this.selectedDirectory.set(null);
+    this.selectedTreeUri.set(pickedPath.startsWith('content://') ? pickedPath : null);
     this.selectedFolderPath.set(absolutePath);
     this.folderSelected.emit(absolutePath);
     this.browser.beginLoad(folderName);
@@ -783,6 +1168,7 @@ export class Menu implements OnInit {
       }
       this.browser.setSourceDirectory(dirHandle);
       this.selectedDirectory.set(dirHandle);
+      this.selectedTreeUri.set(null);
       this.selectedFolderPath.set(null);
       this.folderSelected.emit(`/${dirHandle.name}`);
       this.browser.beginLoad(dirHandle.name);
@@ -842,6 +1228,7 @@ export class Menu implements OnInit {
 
   private openFallbackFolderPicker(): void {
     this.browser.setSourceDirectory(null);
+    this.selectedTreeUri.set(null);
     const input = document.createElement('input');
     input.type = 'file';
     input.setAttribute('webkitdirectory', '');

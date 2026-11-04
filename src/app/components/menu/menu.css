@@ -361,6 +361,55 @@ display: flex;
   transform: translateY(2px);
 }
 
+.duplicates-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, .72);
+}
+
+.duplicates-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 100%);
+  max-height: min(85vh, 900px);
+  padding: 18px;
+  color: var(--text-color, #00A3E0);
+  background: var(--bg-app, #2c2c31);
+  border: 2px solid var(--border-color, #00A3E0);
+  box-shadow: 0 12px 40px #000;
+}
+
+.duplicates-header, .duplicate-file, .duplicate-actions { display: flex; align-items: center; }
+.duplicates-header { justify-content: space-between; gap: 12px; }
+.duplicates-header h2, .duplicate-group h3 { margin: 0; }
+.duplicates-close { border: 0; background: none; color: inherit; font-size: 1.8rem; cursor: pointer; }
+.duplicates-note, .duplicates-message, .duplicates-error { margin: 12px 0; }
+.duplicates-note, .duplicate-info small { font-size: .8rem; opacity: .8; }
+.duplicates-error { color: #ff7777; }
+.duplicates-list { overflow: auto; }
+.duplicate-group { margin: 10px 0; padding: 10px; border: 1px solid var(--border-color, #00A3E0); }
+.duplicate-group h3 { margin-bottom: 8px; font-size: .95rem; }
+.duplicate-file { justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid #ffffff24; }
+.duplicate-info { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.duplicate-info small { color: inherit; }
+.duplicate-actions { flex-shrink: 0; gap: 5px; }
+.duplicate-actions button { padding: 6px 8px; border: 1px solid var(--border-color, #00A3E0); color: inherit; background: var(--bg-header, #37373e); cursor: pointer; }
+.duplicate-actions button:hover { filter: brightness(1.25); }
+.duplicate-actions .duplicate-kept { border-color: #5ccb3a; color: #9bea84; }
+.sync-dialog { width: min(900px, 100%); }
+.sync-all-actions { display: flex; justify-content: flex-end; gap: 8px; margin: 4px 0 10px; }
+.sync-all-actions button { padding: 9px 14px; border: 1px solid var(--border-color, #00A3E0); color: inherit; background: var(--bg-header, #37373e); font-weight: 700; cursor: pointer; }
+.sync-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+@media (max-width: 600px) {
+  .duplicates-dialog { padding: 12px; }
+  .duplicate-file { align-items: flex-start; flex-direction: column; }
+}
+
 .fa-icon {
   color: var(--fontawesome-color, #EC4AA8);
   font-size: 1.3rem;
