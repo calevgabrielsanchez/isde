@@ -4,7 +4,7 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import {
   faFolderOpen, faBookmark, faChevronUp, faChevronDown,
   faHeart, faStar, faDownload, faImage, faMusic, faVideo, faFolder, faCamera, faCode,
-  faPlus, faFilePen, faKey, faTrash, faCheck,
+  faPlus, faFilePen, faKey, faTrash, faCheck,faFolderPlus,
   faCircle, faSquare, faCube, faSeptagon, faPentagon, faOctagon, faHexagon, faShapes, 
   faGhost, faDragon, faCrow, faDemocrat, faLandmark, faRepublican, faTrophy, 
   faChess, faChessKnight, faChessPawn, faChessRook, faChessBishop, faChessQueen, faChessKing,
@@ -14,9 +14,10 @@ import {
 faFire, faWater, faLeaf, faTree, faMountain, faSun, faMoon, faStarHalf, faHouse,
 faPerson, faPersonDress, faGamepad, faPuzzlePiece, faLightbulb, faBook, faGraduationCap, faLaptop, faMobile, 
 faFishFins, faBug, faPalette, faPencil, faBuilding, faSeedling, faRadio, faRadiation, faSpaghettiMonsterFlying,
-faSkull, faSkullCrossbones, faScrewdriverWrench
+  faSkull, faSkullCrossbones, faScrewdriverWrench, faSpinner
 } from '@fortawesome/free-solid-svg-icons';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
+import * as solidIconPack from '@fortawesome/free-solid-svg-icons';
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { FilePicker } from '@capawesome/capacitor-file-picker';
@@ -35,7 +36,7 @@ export interface BookmarkIconOption {
   icon: IconDefinition;
 }
 
-export const BOOKMARK_ICON_OPTIONS: BookmarkIconOption[] = [
+const CURATED_BOOKMARK_ICON_OPTIONS: BookmarkIconOption[] = [
     { label: 'Marcador', icon: faBookmark },
     { label: 'Corazón', icon: faHeart },
     { label: 'Estrella', icon: faStar },
@@ -127,11 +128,46 @@ export const BOOKMARK_ICON_OPTIONS: BookmarkIconOption[] = [
     { label: 'Desarmador-llave', icon: faScrewdriverWrench },
 ];
 
+const curatedLabels = new Map(
+  CURATED_BOOKMARK_ICON_OPTIONS.map(({ label, icon }) => [icon.iconName, label]),
+);
+
+export const BOOKMARK_ICON_OPTIONS: BookmarkIconOption[] = [
+  ...new Map(
+    Object.values(solidIconPack)
+      .filter((value): value is IconDefinition =>
+        typeof value === 'object' && value !== null && 'iconName' in value && 'icon' in value &&
+        (value as IconDefinition).prefix === 'fas',
+      )
+      .map((icon) => [icon.iconName, {
+        icon,
+        label: curatedLabels.get(icon.iconName) ?? icon.iconName
+          .replace(/^fa/, '')
+          .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+          .replace(/^./, (letter) => letter.toUpperCase()),
+      }]),
+  ).values(),
+].sort((first, second) => first.label.localeCompare(second.label));
+const BOOKMARK_ICONS_BY_NAME = new Map<string, IconDefinition>(
+  BOOKMARK_ICON_OPTIONS.map(({ icon }) => [icon.iconName, icon]),
+);
+
+export const BOOKMARK_ICON_TABS = [
+  'Todos', 'Acciones', 'Personas', 'Naturaleza', 'Transporte', 'Objetos', 'Símbolos',
+] as const;
+export type BookmarkIconTab = typeof BOOKMARK_ICON_TABS[number];
+
+function bookmarkIconCategory(iconName: string): Exclude<BookmarkIconTab, 'Todos'> {
+  if (/(person|user|people|child|baby|face|hand|address|id-card|users|user-)/.test(iconName)) return 'Personas';
+  if (/(tree|leaf|flower|seedling|cloud|sun|moon|water|mountain|animal|dog|cat|bird|fish|bug|horse|frog|spider|paw|hippo|dragon|fire|snow|wind|earth|plant|forest|feather|rain|temperature)/.test(iconName)) return 'Naturaleza';
+  if (/(car|truck|bus|train|plane|ship|bicycle|motorcycle|rocket|taxi|van|helicopter|scooter|subway|transport|wheelchair|anchor|road|traffic)/.test(iconName)) return 'Transporte';
+  if (/(heart|star|circle|square|triangle|diamond|gem|cross|check|xmark|question|exclamation|plus|minus|equals|infinity|copyright|hashtag|at|quote|symbol|peace|flag|award|trophy|medal|bookmark|thumbs|smile|frown)/.test(iconName)) return 'Símbolos';
+  if (/(computer|laptop|mobile|phone|tablet|camera|video|image|music|file|folder|book|key|lock|lightbulb|tool|wrench|hammer|gear|cog|house|building|briefcase|gift|clock|calendar|bell|envelope|keyboard|plug|database|print|microchip|robot|cube|box|basket|cart|utensil|mug|glass|bottle|shirt|shoe|couch|bed|bath|toilet|wallet|credit-card|money|coins|cash|chart|calculator|pen|pencil|paint|palette|scissors|ruler)/.test(iconName)) return 'Objetos';
+  return 'Acciones';
+}
+
 export function resolveBookmarkIcon(iconName: string): IconDefinition {
-  return (
-    BOOKMARK_ICON_OPTIONS.find((option) => option.icon.iconName === iconName)?.icon ??
-    faBookmark
-  );
+  return BOOKMARK_ICONS_BY_NAME.get(iconName) ?? faBookmark;
 }
 
 export interface PickedFolder {
@@ -212,8 +248,9 @@ export class Menu implements OnInit {
   faKey = faKey;
   faTrash = faTrash;
   faCheck = faCheck;
+  faSpinner = faSpinner;
   isNative = Capacitor.isNativePlatform();
-
+faFolderPlus = faFolderPlus;
   private readonly browser = inject(FileBrowserService);
 
   readonly selectedPath = input<string>('');
@@ -248,6 +285,7 @@ export class Menu implements OnInit {
   selectedTreeUri = signal<string | null>(null);
   readonly duplicateGroups = signal<DuplicateFile[][]>([]);
   readonly duplicateLoading = signal(false);
+  readonly duplicateLoadingMessage = signal('Revisando archivos y subdirectorios…');
   readonly duplicateError = signal<string | null>(null);
   readonly duplicateDialogOpen = signal(false);
   readonly keptDuplicatePaths = signal<Set<string>>(new Set());
@@ -268,8 +306,18 @@ export class Menu implements OnInit {
   }
 
   bookmarkIconOptions: BookmarkIconOption[] = BOOKMARK_ICON_OPTIONS;
+  bookmarkIconTabs = BOOKMARK_ICON_TABS;
+  selectedBookmarkIconTab = signal<BookmarkIconTab>('Todos');
+  visibleBookmarkIconOptions = computed(() => {
+    const tab = this.selectedBookmarkIconTab();
+    if (tab === 'Todos') return this.bookmarkIconOptions;
+    return this.bookmarkIconOptions.filter((option) => bookmarkIconCategory(option.icon.iconName) === tab);
+  });
 
-  selectedBookmarkIconIndex = signal<number>(0);
+  selectedBookmarkIconIndex = signal<number>(Math.max(
+    0,
+    BOOKMARK_ICON_OPTIONS.findIndex((option) => option.icon.iconName === faBookmark.iconName),
+  ));
   selectedBookmarkIcon = computed(() => this.bookmarkIconOptions[this.selectedBookmarkIconIndex()]?.icon ?? faBookmark);
   iconDropdownOpen = signal<boolean>(false);
   editingBookmark = signal<boolean>(false);
@@ -277,6 +325,10 @@ export class Menu implements OnInit {
 
   toggleIconDropdown(): void {
     this.iconDropdownOpen.update((open) => !open);
+  }
+
+  selectBookmarkIconTab(tab: BookmarkIconTab): void {
+    this.selectedBookmarkIconTab.set(tab);
   }
 
   selectBookmarkIcon(index: number): void {
@@ -339,9 +391,7 @@ export class Menu implements OnInit {
         .map((item) => ({
           name: item.name,
           path: item.path,
-          icon: typeof item.icon === 'string'
-            ? (this.bookmarkIconOptions.find((option) => option.icon.iconName === item.icon)?.icon ?? faBookmark)
-            : faBookmark,
+          icon: typeof item.icon === 'string' ? resolveBookmarkIcon(item.icon) : faBookmark,
           treeUri: typeof item.treeUri === 'string' ? item.treeUri : undefined,
           treePath: typeof item.treePath === 'string' ? item.treePath : undefined,
         }));
@@ -383,9 +433,7 @@ export class Menu implements OnInit {
         .map((item) => ({
           name: item.name,
           path: item.path,
-          icon: typeof item.icon === 'string'
-            ? (this.bookmarkIconOptions.find((option) => option.icon.iconName === item.icon)?.icon ?? faBookmark)
-            : faBookmark,
+          icon: typeof item.icon === 'string' ? resolveBookmarkIcon(item.icon) : faBookmark,
           treeUri: typeof item.treeUri === 'string' ? item.treeUri : undefined,
           treePath: typeof item.treePath === 'string' ? item.treePath : undefined,
         }));
@@ -445,7 +493,7 @@ export class Menu implements OnInit {
     }
     let folder: PickedFolder;
     if (bookmark.treeUri && bookmark.treeUri.includes('/tree/')) {
-      const startDocumentUri = this.startDocumentUriForTree(bookmark.treeUri);
+       const startDocumentUri = this.startDocumentUriForTree(bookmark.treeUri, bookmark.treePath);
       try {
         const result = await FileTree.pickTree({ startDocumentUri });
         folder = { path: this.rootPathFromPickedPath(result.treeUri), ...this.folderTreeInfo(result.treeUri) };
@@ -509,12 +557,70 @@ export class Menu implements OnInit {
     void this.openWebFolder();
   }
 
+  async onAddBookmarkFolder(): Promise<void> {
+    try {
+      const newBookmarks: BookmarkItem[] = [];
+      if (this.isNative) {
+        const { treeUri } = await FileTree.pickTree({});
+        const { files } = await FileTree.list({ treeUri });
+        const rootPath = this.rootPathFromPickedPath(treeUri).replace(/\/+$/, '');
+        for (const entry of files) {
+          if (entry.isDirectory) {
+            newBookmarks.push({
+              name: entry.name,
+              path: `${rootPath}/${entry.name}`,
+              icon: faFolder,
+              treeUri,
+              treePath: entry.name,
+            });
+          }
+        }
+      } else {
+        const picker = window as Window & {
+          showDirectoryPicker?: (options?: { mode?: 'read' | 'readwrite' }) => Promise<FileSystemDirectoryHandle>;
+        };
+        if (!picker.showDirectoryPicker) {
+          window.alert('Agregar carpetas de marcadores requiere un navegador compatible con selección de carpetas.');
+          return;
+        }
+        const root = await picker.showDirectoryPicker({ mode: 'read' });
+        for await (const entry of root.values()) {
+          if (entry.kind === 'directory') {
+            newBookmarks.push({ name: entry.name, path: `/${root.name}/${entry.name}`, icon: faFolder });
+          }
+        }
+      }
+      if (!newBookmarks.length) {
+        window.alert('La carpeta seleccionada no contiene subcarpetas de primer nivel.');
+        return;
+      }
+      const existing = new Set(this.bookmarks().map((bookmark) => `${bookmark.treeUri ?? ''}|${bookmark.treePath ?? bookmark.path}`));
+      const additions = newBookmarks.filter((bookmark) => {
+        const key = `${bookmark.treeUri ?? ''}|${bookmark.treePath ?? bookmark.path}`;
+        if (existing.has(key)) return false;
+        existing.add(key);
+        return true;
+      });
+      this.bookmarks.update((current) => [...current, ...additions]);
+      this.saveBookmarks(this.bookmarks());
+      this.bookmarksChange.emit(this.bookmarks());
+      if (!additions.length) window.alert('Las subcarpetas ya estaban agregadas como marcadores.');
+    } catch (error) {
+      const reason = error as { name?: string; message?: string };
+      if (reason?.name !== 'AbortError' && !reason?.message?.includes('canceled')) {
+        console.error('No se pudieron agregar las carpetas como marcadores:', error);
+        window.alert(reason?.message || String(error));
+      }
+    }
+  }
+
   async onSearchDuplicates(): Promise<void> {
     this.duplicateError.set(null);
     this.duplicateGroups.set([]);
     this.keptDuplicatePaths.set(new Set());
     this.duplicateDialogOpen.set(true);
     this.duplicateLoading.set(true);
+    this.duplicateLoadingMessage.set('Revisando archivos y subdirectorios…');
     try {
       const candidates: Omit<DuplicateFile, 'sha256'>[] = [];
       const webRoot = this.selectedDirectory();
@@ -619,6 +725,43 @@ export class Menu implements OnInit {
     }
     this.keptDuplicatePaths.update((current) => new Set(current).add(file.path));
     if (failures.length) window.alert(`Se conservará “${file.name}”, pero no se pudieron eliminar todos los duplicados:\n${failures.join('\n')}`);
+  }
+
+  async keepOnePerDuplicateGroup(): Promise<void> {
+    if (this.duplicateLoading()) return;
+    const groups = this.duplicateGroups();
+    const duplicatesToDelete = groups.flatMap((group) => group.slice(1));
+    if (!duplicatesToDelete.length) return;
+    if (!window.confirm(
+      `Se conservará el primer archivo de cada uno de los ${groups.length} grupos y se eliminarán ${duplicatesToDelete.length} duplicado(s). ¿Continuar?`,
+    )) return;
+
+    this.keptDuplicatePaths.update((current) => {
+      const next = new Set(current);
+      for (const group of groups) next.add(group[0].path);
+      return next;
+    });
+    this.duplicateLoadingMessage.set(`Eliminando duplicados (0 de ${duplicatesToDelete.length})…`);
+    this.duplicateLoading.set(true);
+    const failures: string[] = [];
+    let completed = 0;
+    try {
+      for (const file of duplicatesToDelete) {
+        try {
+          await this.removeDuplicateFile(file);
+        } catch (error) {
+          failures.push(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        completed++;
+        this.duplicateLoadingMessage.set(`Eliminando duplicados (${completed} de ${duplicatesToDelete.length})…`);
+      }
+    } finally {
+      this.duplicateLoading.set(false);
+      this.duplicateLoadingMessage.set('Revisando archivos y subdirectorios…');
+    }
+    if (failures.length) {
+      window.alert(`Se conservará un archivo por grupo cuando fue posible, pero no se pudieron eliminar ${failures.length} archivo(s):\n\n${failures.join('\n')}`);
+    }
   }
 
   isDuplicateKept(path: string): boolean {
@@ -868,7 +1011,7 @@ export class Menu implements OnInit {
     return webPath !== null ? { path: webPath } : null;
   }
 
-  private startDocumentUriForTree(treeUri: string): string | undefined {
+  private startDocumentUriForTree(treeUri: string, treePath?: string): string | undefined {
     const treeMatch = treeUri.match(/\/tree\/([^/]+)$/);
     if (!treeMatch) {
       return undefined;
@@ -879,7 +1022,8 @@ export class Menu implements OnInit {
     } catch {
       treeId = treeMatch[1];
     }
-    return `${treeUri}/document/${encodeURIComponent(treeId)}`;
+    const documentId = treePath ? `${treeId}/${treePath}` : treeId;
+    return `${treeUri}/document/${encodeURIComponent(documentId)}`;
   }
 
   private folderTreeInfo(pickedPath: string): { treeUri?: string; treePath?: string } {

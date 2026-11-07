@@ -53,8 +53,10 @@ export class Reproductor implements OnDestroy {
   readonly renameText = signal<string>('');
   readonly isSavingRename = signal<boolean>(false);
   readonly renameError = signal<string | null>(null);
-  readonly longPressTooltip = signal<{ text: string; x: number; y: number } | null>(null);
+  readonly showBookmarkNames = signal(false);
+  readonly bookmarksVisible = signal(true);
   private longPressTimer: ReturnType<typeof setTimeout> | null = null;
+  private longPressTriggered = false;
   readonly imageZoom = signal(1);
   readonly imageZoomOrigin = signal('50% 50%');
 
@@ -233,28 +235,50 @@ export class Reproductor implements OnDestroy {
     }
   }
 
-  startLongPressTooltip(event: PointerEvent, edge: string, bookmark: BookmarkItem): void {
-    if (edge !== 'top') {
-      return;
-    }
-    const target = event.currentTarget as HTMLElement | null;
-    if (!target) {
-      return;
-    }
-    const text = this.bookmarkDenied(bookmark) ? `${bookmark.name} (sin permiso)` : bookmark.name;
-    const rect = target.getBoundingClientRect();
-    this.cancelLongPressTooltip();
+  onStagePointerDown(event: PointerEvent): void {
+    this.onSwipeStart(event);
+    this.longPressTriggered = false;
+    if ((event.target as HTMLElement | null)?.closest('button')) return;
+    this.cancelStageLongPress();
     this.longPressTimer = setTimeout(() => {
-      this.longPressTooltip.set({ text, x: rect.left + rect.width / 2, y: rect.top });
+      this.showBookmarkNames.set(true);
+      this.longPressTriggered = true;
     }, 500);
   }
 
-  cancelLongPressTooltip(): void {
+  endStageLongPress(): void {
     if (this.longPressTimer) {
       clearTimeout(this.longPressTimer);
       this.longPressTimer = null;
     }
-    this.longPressTooltip.set(null);
+    if (this.longPressTriggered) {
+      this.showBookmarkNames.set(false);
+    }
+  }
+
+  onStagePointerUp(event: PointerEvent): void {
+    this.onSwipeEnd(event);
+    this.endStageLongPress();
+  }
+
+  cancelStageLongPress(): void {
+    if (this.longPressTimer) {
+      clearTimeout(this.longPressTimer);
+      this.longPressTimer = null;
+    }
+  }
+
+  private consumeLongPressClick(): boolean {
+    if (!this.longPressTriggered) return false;
+    this.longPressTriggered = false;
+    return true;
+  }
+
+  toggleBookmarksVisibility(event: MouseEvent): void {
+    if (this.consumeLongPressClick()) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('button, input, textarea, select, a')) return;
+    this.bookmarksVisible.update((visible) => !visible);
   }
 
   isBookmarkSelected(index: number): boolean {
@@ -277,7 +301,7 @@ export class Reproductor implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.cancelLongPressTooltip();
+    this.cancelStageLongPress();
     this.revokeCreatedUrls();
   }
 

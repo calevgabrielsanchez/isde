@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, signal, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faBurger, faSmile, faFolderOpen, faDragon, faGlobe, faCoffee } from '@fortawesome/free-solid-svg-icons';
+import { faBurger, faSmile, faFolderOpen, faDragon, faGlobe, faCoffee, faExpand, faCompress } from '@fortawesome/free-solid-svg-icons';
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { Menu } from "../menu/menu";
@@ -27,6 +27,13 @@ export class Main implements OnInit {
   faDragon = faDragon;
   faGlobe = faGlobe;
   faCoffee = faCoffee;
+  faExpand = faExpand;
+  faCompress = faCompress;
+  readonly footerMinimized = signal(true);
+
+  toggleFooter(): void {
+    this.footerMinimized.update((minimized) => !minimized);
+  }
 
 
   version = '1.0.0'; // Versión de la aplicación (se muestra en el footer)
@@ -395,6 +402,11 @@ export class Main implements OnInit {
           next[uri] = true;
           return;
         }
+        // Los permisos persistidos rara vez cambian al alternar perfiles; conserva
+        // los ya confirmados para evitar una ronda nativa de SAF por cada cambio.
+        if (next[uri] === true) {
+          return;
+        }
         try {
           const result = await FileTree.check({ treeUri: uri });
           next[uri] = result.ok;
@@ -460,7 +472,8 @@ export class Main implements OnInit {
   }
 
   async onMoveTriggered(): Promise<void> {
-    void this.fileBrowserRef?.moveSelectedToBookmarks();
+    this.syncProgress();
+    await this.fileBrowserRef?.moveSelectedToBookmarks();
     this.syncProgress();
     this.refreshStatus();
   }

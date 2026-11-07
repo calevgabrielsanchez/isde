@@ -47,7 +47,16 @@
     </main>
 
     <!-- Barra de estado inferior -->
-    <footer class="app-footer" [class.app-footer-active]="statusInfo.total > 0" [class.app-footer-progressing]="moveProgress() !== null || fileBrowser.loading()">
+    <footer class="app-footer" [class.app-footer-active]="statusInfo.total > 0" [class.app-footer-progressing]="moveProgress() !== null || fileBrowser.loading()" [class.app-footer-minimized]="footerMinimized()" [class.app-footer-expanded]="!footerMinimized()">
+      <div class="app-footer-topline">
+        <span class="app-footer-hint">Toca el marcador en un archivo para elegir su destino.</span>
+        <button type="button" class="app-footer-toggle" (click)="toggleFooter()"
+          [attr.aria-label]="footerMinimized() ? 'Expandir pie de página' : 'Minimizar pie de página'"
+          [attr.title]="footerMinimized() ? 'Expandir' : 'Minimizar'">
+          <fa-icon [icon]="footerMinimized() ? faExpand : faCompress"></fa-icon>
+        </button>
+      </div>
+      <div class="app-footer-content">
       @if (fileBrowser.loading()) {
         <div class="app-footer-progress app-footer-loading">
           <div class="app-footer-progress-track">
@@ -73,10 +82,8 @@
             </span>
           }
         </div>
-      } @else {
-        <span class="app-footer-hint">Toca el marcador en un archivo para elegir su destino.</span>
       }
-      
+      </div>
     </footer>
     <footer class="app-footer-creality"><span>CrealitySolution.com</span><span class="footer-vents" aria-hidden="true"></span><span>{{ version }}</span></footer>
   </div>

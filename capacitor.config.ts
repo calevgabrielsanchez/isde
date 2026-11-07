@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.isde.app',
-  appName: 'isDe',
+  appName: 'CaleVRijArChiVos',
   webDir: 'dist/isde-app/browser'
 };
 

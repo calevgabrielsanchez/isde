@@ -116,6 +116,22 @@
   color: #ff5b5b;
 }
 
+.reproductor-bookmark:has(.reproductor-bookmark-name) {
+  width: auto;
+  min-width: 28px;
+  max-width: min(220px, 55vw);
+  height: auto;
+  min-height: 28px;
+  padding: 5px 9px;
+  border-radius: 16px;
+}
+
+.reproductor-bookmark-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .reproductor-longpress-tooltip {
   position: fixed;
   z-index: 1000;

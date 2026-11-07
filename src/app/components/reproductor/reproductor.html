@@ -27,11 +27,14 @@
 
     <div
       class="reproductor-stage"
-      (click)="$event.stopPropagation()"
-      (pointerdown)="onSwipeStart($event)"
-      (pointerup)="onSwipeEnd($event)"
+      (click)="$event.stopPropagation(); toggleBookmarksVisibility($event)"
+      (pointerdown)="onStagePointerDown($event)"
+      (pointerup)="onStagePointerUp($event)"
+      (pointerleave)="endStageLongPress()"
+      (pointercancel)="endStageLongPress()"
       (pointercancel)="cancelSwipe()"
     >
+      @if (bookmarksVisible()) {
       @for (slot of bookmarkSlots(); track $index) {
         <button
           type="button"
@@ -42,13 +45,14 @@
           [attr.title]="slot.bookmark.name"
           [attr.aria-label]="'Asignar a ' + slot.bookmark.name + ' y avanzar al siguiente archivo'"
           (click)="$event.stopPropagation(); selectBookmark(slot.index)"
-          (pointerdown)="startLongPressTooltip($event, slot.position.edge, slot.bookmark)"
-          (pointerup)="cancelLongPressTooltip()"
-          (pointerleave)="cancelLongPressTooltip()"
-          (pointercancel)="cancelLongPressTooltip()"
         >
-          <fa-icon [icon]="slot.bookmark.icon"></fa-icon>
+          @if (showBookmarkNames()) {
+            <span class="reproductor-bookmark-name">{{ slot.bookmark.name }}</span>
+          } @else {
+            <fa-icon [icon]="slot.bookmark.icon"></fa-icon>
+          }
         </button>
+      }
       }
       @switch (mediaKind()) {
         @case ('image') {
@@ -157,10 +161,5 @@
         <div class="reproductor-rename-error">{{ error }}</div>
       }
     </div>
-    @if (longPressTooltip(); as tooltip) {
-      <div class="reproductor-longpress-tooltip" [style.left.px]="tooltip.x" [style.top.px]="tooltip.y">
-        {{ tooltip.text }}
-      </div>
-    }
   </div>
 }

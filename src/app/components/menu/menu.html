@@ -12,6 +12,9 @@
   <!-- Sección Marcadores -->
   <div class="marcadores-section">
     <h2 class="marcadores-title">Marcadores:</h2>
+    <button type="button" class="btn-mover" (click)="onAddBookmarkFolder()">
+      <fa-icon [icon]="faFolderPlus" class="fa-icon"></fa-icon>
+    </button>
     
     <div class="list-container">
       <div class="list-content">
@@ -58,11 +61,22 @@
       </button>
       @if (iconDropdownOpen()) {
         <div class="icon-dropdown">
-          @for (icon of bookmarkIconOptions; track icon.label; let i = $index) {
-            <button class="icon-option" [class.selected]="i === selectedBookmarkIconIndex()" (click)="selectBookmarkIcon(i)" aria-label="{{ icon.label }}">
-              <fa-icon [icon]="icon.icon" class="item-icon"></fa-icon>
-            </button>
-          }
+          <div class="icon-dropdown-tabs" role="tablist" aria-label="Secciones de iconos">
+            @for (tab of bookmarkIconTabs; track tab) {
+              <button type="button" role="tab" [attr.aria-selected]="selectedBookmarkIconTab() === tab"
+                [class.active]="selectedBookmarkIconTab() === tab" (click)="selectBookmarkIconTab(tab)">
+                {{ tab }}
+              </button>
+            }
+          </div>
+          <div class="icon-dropdown-options">
+            @for (icon of visibleBookmarkIconOptions(); track icon.icon.iconName; let i = $index) {
+              <button class="icon-option" [class.selected]="icon.icon === selectedBookmarkIcon()"
+                (click)="selectBookmarkIcon(bookmarkIconOptions.indexOf(icon))" [attr.aria-label]="icon.label" [attr.title]="icon.label">
+                <fa-icon [icon]="icon.icon" class="item-icon"></fa-icon>
+              </button>
+            }
+          </div>
         </div>
       }
     </div>
@@ -128,16 +142,19 @@
         </header>
         <p class="duplicates-note">Se comparó el contenido completo (SHA-256); nombre, tamaño y fecha de modificación son datos auxiliares. La fecha de creación no está disponible en todos los sistemas.</p>
         @if (duplicateLoading()) {
-          <p class="duplicates-message">Revisando archivos y subdirectorios…</p>
+          <p class="duplicates-message duplicates-working"><fa-icon [icon]="faSpinner" class="duplicates-spinner"></fa-icon>{{ duplicateLoadingMessage() }}</p>
         } @else if (duplicateError()) {
           <p class="duplicates-error">{{ duplicateError() }}</p>
         } @else if (duplicateGroups().length === 0) {
           <p class="duplicates-message">No se encontraron archivos duplicados.</p>
         } @else {
           <p class="duplicates-message">{{ duplicateGroups().length }} grupo(s) de archivos idénticos.</p>
+          <div class="duplicate-bulk-actions">
+            <button type="button" (click)="keepOnePerDuplicateGroup()">Mantener un duplicado por grupo</button>
+          </div>
           <div class="duplicates-list">
             @for (group of duplicateGroups(); track $index) {
-              <article class="duplicate-group">
+              <article class="duplicate-group" [class.duplicate-group-alt]="$index % 2 === 1">
                 <h3>Grupo {{ $index + 1 }} · {{ group[0].size | number }} bytes</h3>
                 @for (file of group; track file.path) {
                   <div class="duplicate-file">

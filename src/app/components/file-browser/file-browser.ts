@@ -316,7 +316,7 @@ export class FileBrowser {
         await FileTree.move({
           sourceUri: entry.path,
           destTreeUri: bookmark.treeUri,
-          destRelativePath,
+          destRelativePath: bookmark.treePath ? `${bookmark.treePath}/${destRelativePath}` : destRelativePath,
         });
       } catch (error) {
         const message = error instanceof Error ? (error.message || '') : String(error);
@@ -364,13 +364,13 @@ export class FileBrowser {
     const lines: string[] = isWindows
       ? [
           '@echo off',
-          'REM Generado por isDe. Rellena las rutas reales entre comillas antes de ejecutar.',
+          'REM Generado por CaleVRijArChiVos. Rellena las rutas reales entre comillas antes de ejecutar.',
           'REM SOURCE_ROOT debe apuntar a la carpeta que contiene los archivos de origen.',
           'SET "SOURCE_ROOT=ESCRIBE_AQUI_LA_RUTA_DE_LA_CARPETA_ORIGEN"',
         ]
       : [
           '#!/usr/bin/env bash',
-          '# Generado por isDe. Rellena las rutas reales antes de ejecutar.',
+          '# Generado por CaleVRijArChiVos. Rellena las rutas reales antes de ejecutar.',
           '# SOURCE_ROOT debe apuntar a la carpeta que contiene los archivos de origen.',
           'SOURCE_ROOT="ESCRIBE_AQUI_LA_RUTA_DE_LA_CARPETA_ORIGEN"',
         ];

@@ -142,21 +142,70 @@ app-menu.menu-hidden {
 
 /* --- Barra de estado inferior --- */
 .app-footer {
-     display: flex;
-    flex-direction: column;
-    /* align-items: stretch; */
-    gap: 6px;
-    height: 100px;
-    min-height: 48px;
-    /* max-height: 48px; */
-    padding: 6px 12px;
-    background-color: var(--bg-header);
-    border-top: 2px solid var(--border-color);
-    border-top: 2px solid #3e494d; background: linear-gradient(#727c7f, #bfc6c7);
-    font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif;
-    font-size: .85rem;
-    border-radius: 0 0 8px 8px;
-    /* overflow: clip; */
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  gap: 6px;
+  height: 100px;
+  min-height: 48px;
+  padding: 6px 12px;
+  background: linear-gradient(#727c7f, #bfc6c7);
+  border-top: 2px solid #3e494d;
+  font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif;
+  font-size: .85rem;
+  border-radius: 0 0 8px 8px;
+  overflow: hidden;
+}
+
+.app-footer-minimized {
+  height: 48px;
+  min-height: 48px;
+  max-height: 48px;
+}
+
+.app-footer-expanded {
+  height: 50vh;
+  min-height: 50vh;
+  max-height: 50vh;
+}
+
+.app-footer-topline {
+  display: flex;
+  align-items: center;
+  flex: 0 0 32px;
+  gap: 8px;
+  min-width: 0;
+}
+
+.app-footer-toggle {
+  display: grid;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 28px;
+  place-items: center;
+  margin-left: auto;
+  color: #26383e;
+  background: rgba(255, 255, 255, .35);
+  border: 1px solid #3e494d;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.app-footer-toggle:hover {
+  background: rgba(255, 255, 255, .65);
+}
+
+.app-footer-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-footer-minimized .app-footer-content {
+  display: none;
 }
 
 .app-footer-active {
@@ -165,9 +214,7 @@ app-menu.menu-hidden {
 
 .app-footer-progressing,
 .app-footer-loading {
-  height: 96px;
   min-height: 96px;
-  max-height: 96px;
 }
 
 .app-footer-count {
