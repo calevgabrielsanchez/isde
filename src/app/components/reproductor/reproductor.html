@@ -39,17 +39,27 @@
         <button
           type="button"
           class="reproductor-bookmark reproductor-bookmark-{{ slot.position.edge }}"
+          [class.reproductor-bookmark-label-up]="$index % 2 === 0"
+          [class.reproductor-bookmark-label-down]="$index % 2 !== 0"
+          [class.reproductor-bookmark-named]="showBookmarkNames()"
           [class.reproductor-bookmark-selected]="isBookmarkSelected(slot.index)"
           [class.reproductor-bookmark-denied]="bookmarkDenied(slot.bookmark)"
           [ngStyle]="bookmarkStyle(slot.position)"
+          [style.--bookmark-accent]="bookmarkAccent(slot.index)"
           [attr.title]="slot.bookmark.name"
           [attr.aria-label]="'Asignar a ' + slot.bookmark.name + ' y avanzar al siguiente archivo'"
-          (click)="$event.stopPropagation(); selectBookmark(slot.index)"
+          (pointerdown)="onBookmarkPointerDown($event)"
+          (pointerup)="onBookmarkPointerEnd($event)"
+          (pointerleave)="onBookmarkPointerLeave($event)"
+          (pointercancel)="onBookmarkPointerCancel($event)"
+          (touchstart)="onBookmarkTouchStart($event)"
+          (touchend)="onBookmarkTouchEnd($event)"
+          (touchcancel)="onBookmarkPointerCancel($event)"
+          (click)="onBookmarkClick($event, slot.index)"
         >
+          <fa-icon [icon]="slot.bookmark.icon"></fa-icon>
           @if (showBookmarkNames()) {
             <span class="reproductor-bookmark-name">{{ slot.bookmark.name }}</span>
-          } @else {
-            <fa-icon [icon]="slot.bookmark.icon"></fa-icon>
           }
         </button>
       }

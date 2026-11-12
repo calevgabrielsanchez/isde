@@ -9,7 +9,7 @@ import { FileBrowser } from "../file-browser/file-browser";
 import { FileBrowserService, type BrowserEntry } from "../../services/file-browser.service";
 import { FileTree } from "../../services/file-tree.plugin";
 import { Reproductor } from "../reproductor/reproductor";
-import type { BookmarkItem } from "../menu/menu";
+import type { BookmarkChange, BookmarkItem } from "../menu/menu";
 import { resolveBookmarkIcon } from "../menu/menu";
 
 @Component({
@@ -96,17 +96,9 @@ export class Main implements OnInit {
     if (targetIndex === -1 || targetIndex === this.profileIndex()) {
       return;
     }
-    this.persistActiveBookmarks();
     this.profileIndex.set(targetIndex);
     this.loadActiveBookmarks();
     void this.checkPermissions(this.bookmarks());
-  }
-
-  private persistActiveBookmarks(): void {
-    // Guarda el set del perfil que se está dejando (el actual) ANTES de cambiar el índice
-    const leavingId = this.profileModes[this.profileIndex()].id;
-    this.bookmarksMap.update((map) => ({ ...map, [leavingId]: this.bookmarks() }));
-    this.saveBookmarksFor(leavingId);
   }
 
   private loadActiveBookmarks(): void {
@@ -254,10 +246,12 @@ export class Main implements OnInit {
     }
   }
 
-  onBookmarksChange(items: BookmarkItem[]): void {
-    const id = this.activeProfileId;
+  onBookmarksChange({ profileId, items }: BookmarkChange): void {
+    const id = profileId;
     this.bookmarksMap.update((map) => ({ ...map, [id]: items }));
-    this.bookmarks.set(items);
+    if (id === this.activeProfileId) {
+      this.bookmarks.set(items);
+    }
     this.saveBookmarksFor(id);
     void this.checkPermissions(items);
   }
@@ -274,39 +268,45 @@ export class Main implements OnInit {
   }
 
   private async loadBookmarksMapNative(): Promise<void> {
-    const map: Record<string, BookmarkItem[]> = {};
-    for (const mode of this.profileModes) {
-      const { value } = await Preferences.get({ key: this.preferenceNameFor(mode.id) });
-      if (value === null || value === undefined) {
-        continue;
-      }
-      try {
-        const parsed = JSON.parse(value) as Array<{
-          name: string;
-          path: string;
-          icon: string;
-          treeUri?: string;
-          treePath?: string;
-        }>;
-        if (!Array.isArray(parsed)) {
-          continue;
+    const profiles = await Promise.all(
+      this.profileModes.map(async (mode): Promise<[string, BookmarkItem[]] | null> => {
+        try {
+          const { value } = await Preferences.get({ key: this.preferenceNameFor(mode.id) });
+          if (value === null || value === undefined) {
+            return null;
+          }
+
+          const parsed = JSON.parse(value) as Array<{
+            name: string;
+            path: string;
+            icon: string;
+            treeUri?: string;
+            treePath?: string;
+          }>;
+          if (!Array.isArray(parsed)) {
+            return null;
+          }
+
+          const bookmarks = parsed
+            .filter((item) => typeof item?.name === 'string' && typeof item?.path === 'string')
+            .map((item) => ({
+              name: item.name,
+              path: item.path,
+              icon: this.matchBookmarkIcon(item.icon),
+              treeUri: typeof item.treeUri === 'string' ? item.treeUri : undefined,
+              treePath: typeof item.treePath === 'string' ? item.treePath : undefined,
+            }));
+          return [mode.id, bookmarks];
+        } catch (error) {
+          console.warn(
+            `No se pudieron cargar los marcadores desde Preferences para ${mode.id}:`,
+            error,
+          );
+          return null;
         }
-        map[mode.id] = parsed
-          .filter((item) => typeof item?.name === 'string' && typeof item?.path === 'string')
-          .map((item) => ({
-            name: item.name,
-            path: item.path,
-            icon: this.matchBookmarkIcon(item.icon),
-            treeUri: typeof item.treeUri === 'string' ? item.treeUri : undefined,
-            treePath: typeof item.treePath === 'string' ? item.treePath : undefined,
-          }));
-      } catch (error) {
-        console.warn(
-          `No se pudieron cargar los marcadores desde Preferences para ${mode.id}:`,
-          error,
-        );
-      }
-    }
+      }),
+    );
+    const map = Object.fromEntries(profiles.filter((profile) => profile !== null)) as Record<string, BookmarkItem[]>;
     this.bookmarksMap.set(map);
     this.loadActiveBookmarks();
   }
@@ -402,9 +402,9 @@ export class Main implements OnInit {
           next[uri] = true;
           return;
         }
-        // Los permisos persistidos rara vez cambian al alternar perfiles; conserva
-        // los ya confirmados para evitar una ronda nativa de SAF por cada cambio.
-        if (next[uri] === true) {
+        // El resultado (también los permisos denegados) se conserva entre perfiles.
+        // Consultar SAF en cada cambio puede bloquear la interfaz en algunos dispositivos.
+        if (uri in next) {
           return;
         }
         try {

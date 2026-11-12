@@ -235,6 +235,10 @@ export class Reproductor implements OnDestroy {
     }
   }
 
+  bookmarkAccent(index: number): string {
+    return `hsl(${Math.round((index * 137.508) % 360)} 78% 67%)`;
+  }
+
   onStagePointerDown(event: PointerEvent): void {
     this.onSwipeStart(event);
     this.longPressTriggered = false;
@@ -244,6 +248,55 @@ export class Reproductor implements OnDestroy {
       this.showBookmarkNames.set(true);
       this.longPressTriggered = true;
     }, 500);
+  }
+
+  onBookmarkPointerDown(event: PointerEvent): void {
+    event.stopPropagation();
+    if (event.pointerType === 'touch') return;
+    this.startBookmarkLongPress();
+  }
+
+  onBookmarkTouchStart(event: TouchEvent): void {
+    event.stopPropagation();
+    this.startBookmarkLongPress();
+  }
+
+  private startBookmarkLongPress(): void {
+    this.cancelStageLongPress();
+    this.longPressTriggered = false;
+    this.showBookmarkNames.set(false);
+    this.longPressTimer = setTimeout(() => {
+      this.showBookmarkNames.set(true);
+      this.longPressTriggered = true;
+    }, 500);
+  }
+
+  onBookmarkPointerEnd(event: PointerEvent): void {
+    event.stopPropagation();
+    if (event.pointerType === 'touch') return;
+    this.endStageLongPress();
+  }
+
+  onBookmarkTouchEnd(event: TouchEvent): void {
+    event.stopPropagation();
+    this.endStageLongPress();
+  }
+
+  onBookmarkPointerLeave(event: PointerEvent): void {
+    if (event.pointerType === 'touch') return;
+    this.onBookmarkPointerCancel(event);
+  }
+
+  onBookmarkPointerCancel(event: Event): void {
+    event.stopPropagation();
+    this.endStageLongPress();
+    this.longPressTriggered = false;
+  }
+
+  onBookmarkClick(event: MouseEvent, index: number): void {
+    event.stopPropagation();
+    if (this.consumeLongPressClick()) return;
+    this.selectBookmark(index);
   }
 
   endStageLongPress(): void {

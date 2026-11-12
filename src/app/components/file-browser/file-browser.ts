@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faFile, faFolder, faFileImage,
@@ -110,6 +110,18 @@ export class FileBrowser {
   readonly permissionMap = input<Record<string, boolean>>({});
   readonly openMedia = output<BrowserEntry>();
 
+  // Se crea el DOM del grupo al activarlo por primera vez y se conserva al alternar.
+  readonly cachedProfileIds = signal<string[]>([]);
+
+  constructor() {
+    effect(() => {
+      const profileId = this.activeProfileId();
+      if (profileId) {
+        this.cachedProfileIds.update((ids) => ids.includes(profileId) ? ids : [...ids, profileId]);
+      }
+    });
+  }
+
   // Marcadores del perfil actualmente visible en la UI
   readonly activeProfileBookmarks = computed(
     () => this.bookmarksByProfile()[this.activeProfileId()] ?? this.bookmarks(),
@@ -132,12 +144,24 @@ export class FileBrowser {
     return !!bookmark.treeUri && this.permissionMap()[bookmark.treeUri] === false;
   }
 
-  readonly bookmarkSlots = computed(() => {
-    const items = this.activeProfileBookmarks();
-    return bookmarkPositions(items.length).map((position, index) => ({
-      position,
-      bookmark: items[index],
-    }));
+  readonly bookmarkGroups = computed(() => {
+    const profiles = this.bookmarksByProfile();
+    const activeProfileId = this.activeProfileId();
+    const permissions = this.permissionMap();
+    return this.cachedProfileIds().map((profileId) => {
+      const items = profiles[profileId] ?? (profileId === activeProfileId ? this.bookmarks() : []);
+      const slots = bookmarkPositions(items.length).map((position, index) => ({
+        position,
+        bookmark: items[index],
+        style: this.bookmarkStyle(position),
+        denied: !!items[index].treeUri && permissions[items[index].treeUri!] === false,
+      }));
+      // La clave cambia solo cuando cambia el contenido, para reconstruir ese grupo.
+      const contentKey = JSON.stringify(items.map(({ name, path, icon, treeUri, treePath }) => [
+        name, path, icon.iconName, treeUri ?? '', treePath ?? '',
+      ]));
+      return { profileId, slots, contentKey };
+    });
   });
 
   bookmarkStyle(position: BookmarkPosition): Record<string, string> {
@@ -222,15 +246,15 @@ export class FileBrowser {
     }));
   }
 
-  onFileBrowserClick(entryPath: string, slotIndex: number): boolean {
-    const bookmark = this.activeProfileBookmarks()[slotIndex];
+  onFileBrowserClick(entryPath: string, slotIndex: number, profileId = this.activeProfileId()): boolean {
+    const bookmark = this.bookmarksByProfile()[profileId]?.[slotIndex]
+      ?? (profileId === this.activeProfileId() ? this.bookmarks()[slotIndex] : undefined);
     if (bookmark && this.bookmarkDenied(bookmark)) {
       window.alert(
         `El marcador '${bookmark.name}' no tiene permiso para mover archivos. Bórralo y créalo de nuevo desde el dispositivo.`,
       );
       return false;
     }
-    const profileId = this.activeProfileId();
     this.selectedBookmark.update((current) => {
       const existing = current[entryPath];
       if (existing && existing.profileId === profileId && existing.index === slotIndex) {
@@ -243,9 +267,9 @@ export class FileBrowser {
     return true;
   }
 
-  isBookmarkSelected(entryPath: string, slotIndex: number): boolean {
+  isBookmarkSelected(entryPath: string, slotIndex: number, profileId = this.activeProfileId()): boolean {
     const sel = this.selectedBookmark()[entryPath];
-    return !!sel && sel.profileId === this.activeProfileId() && sel.index === slotIndex;
+    return !!sel && sel.profileId === profileId && sel.index === slotIndex;
   }
 
   isEntryMarked(entryPath: string): boolean {

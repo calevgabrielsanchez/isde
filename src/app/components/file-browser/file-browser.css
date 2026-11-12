@@ -37,6 +37,8 @@
   background-color: var(--bg-header, #37373e);
   cursor: pointer;
   transition: background-color 0.2s;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px;
 }
 
 .fb-item:hover {
@@ -69,6 +71,10 @@
   pointer-events: auto;
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.fb-bookmark-group[hidden] {
+  display: none;
 }
 
 .fb-bookmark:hover {

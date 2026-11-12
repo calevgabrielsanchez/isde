@@ -35,6 +35,8 @@
         [permissionMap]="permissionMap()"
         [rootTreeUri]="rootTreeUri()"
         [profileBookmarks]="profileBookmarks"
+        [bookmarksByProfile]="profileBookmarksMap"
+        [activeProfileId]="activeProfileId"
         (folderSelected)="onFolderSelected($event)"
         (folderLoaded)="onFolderLoaded()"
         (bookmarksChange)="onBookmarksChange($event)"

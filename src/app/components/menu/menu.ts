@@ -28,7 +28,6 @@ import { BrowserEntry, FileBrowserService, MAX_FILES } from '../../services/file
 const IMAGE_EXTENSION = /\.(jpe?g|png|gif|bmp|webp|svg|avif|ico)$/i;
 const BOOKMARKS_COOKIE = 'isdeBookmarks';
 const BOOKMARKS_PREFERENCE = 'isdeBookmarks';
-const BOOKMARKS_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 const LAST_NATIVE_SOURCE_TREE_KEY = 'isdeLastNativeSourceTree';
 
 export interface BookmarkIconOption {
@@ -184,6 +183,11 @@ export interface BookmarkItem {
   treePath?: string;
 }
 
+export interface BookmarkChange {
+  profileId: string;
+  items: BookmarkItem[];
+}
+
 interface DuplicateFile {
   name: string;
   path: string;
@@ -224,18 +228,18 @@ interface SyncDifference {
 export class Menu implements OnInit {
 
   ngOnInit(): void {
-    if (this.profileBookmarks()) {
-      this.bookmarks.set(this.profileBookmarks()!);
-      this.bookmarksChange.emit(this.bookmarks());
+    const profileItems = this.profileBookmarks();
+    if (profileItems !== null) {
+      this.bookmarks.set(profileItems);
       return;
     }
     if (this.isNative) {
       void this.loadBookmarksFromPreferences().then((items) => {
         this.bookmarks.set(items);
-        this.bookmarksChange.emit(this.bookmarks());
+        this.emitBookmarksChange(items);
       });
     } else {
-      this.bookmarksChange.emit(this.bookmarks());
+      this.emitBookmarksChange();
     }
   }
 
@@ -257,12 +261,29 @@ faFolderPlus = faFolderPlus;
   readonly permissionMap = input<Record<string, boolean>>({});
   readonly rootTreeUri = input<string | undefined>(undefined);
   readonly profileBookmarks = input<BookmarkItem[] | null>(null);
+  readonly bookmarksByProfile = input<Record<string, BookmarkItem[]>>({});
+  readonly activeProfileId = input<string>('');
   readonly folderSelected = output<string>();
   readonly folderLoaded = output<void>();
-  readonly bookmarksChange = output<BookmarkItem[]>();
+  readonly bookmarksChange = output<BookmarkChange>();
   readonly moveTriggered = output<void>();
   readonly grantAllAccess = output<void>();
   allAccessGranted = computed(() => !!this.rootTreeUri());
+
+  private emitBookmarksChange(items = this.bookmarks(), profileId = this.activeProfileId()): void {
+    if (profileId) {
+      this.bookmarksChange.emit({ profileId, items });
+    }
+  }
+
+  private bookmarksForProfile(profileId: string): BookmarkItem[] {
+    return this.bookmarksByProfile()[profileId]
+      ?? (profileId === this.activeProfileId() ? this.bookmarks() : []);
+  }
+
+  private bookmarkIdentity(bookmark: BookmarkItem): string {
+    return `${bookmark.treeUri ?? ''}|${bookmark.treePath ?? bookmark.path}`;
+  }
 
   constructor() {
     effect(() => {
@@ -367,8 +388,7 @@ faFolderPlus = faFolderPlus;
         { name, path, icon, treeUri: pending.treeUri, treePath: pending.treePath },
       ]);
     }
-    this.saveBookmarks(this.bookmarks());
-    this.bookmarksChange.emit(this.bookmarks());
+    this.emitBookmarksChange();
     this.selectedPathAddBookMark.set('');
     this.pendingBookmarkTree.set({});
   }
@@ -401,23 +421,6 @@ faFolderPlus = faFolderPlus;
     }
   }
 
-  private serializedBookmarks(items: BookmarkItem[]): Record<string, string | undefined>[] {
-    return items.map(({ name, path, icon, treeUri, treePath }) => ({
-      name,
-      path,
-      icon: icon.iconName,
-      ...(treeUri !== undefined ? { treeUri } : {}),
-      ...(treePath !== undefined ? { treePath } : {}),
-    }));
-  }
-
-  private async saveBookmarksToPreferences(items: BookmarkItem[]): Promise<void> {
-    await Preferences.set({
-      key: BOOKMARKS_PREFERENCE,
-      value: JSON.stringify(this.serializedBookmarks(items)),
-    });
-  }
-
   private async loadBookmarksFromPreferences(): Promise<BookmarkItem[]> {
     const { value } = await Preferences.get({ key: BOOKMARKS_PREFERENCE });
     if (value === null || value === undefined) {
@@ -440,21 +443,6 @@ faFolderPlus = faFolderPlus;
     } catch (error) {
       console.warn('No se pudieron cargar los marcadores desde Preferences:', error);
       return [];
-    }
-  }
-
-  private saveBookmarksToCookie(items: BookmarkItem[]): void {
-    if (typeof document === 'undefined') {
-      return;
-    }
-    document.cookie = `${BOOKMARKS_COOKIE}=${encodeURIComponent(JSON.stringify(this.serializedBookmarks(items)))}; path=/; max-age=${BOOKMARKS_COOKIE_MAX_AGE}; SameSite=Lax`;
-  }
-
-  private saveBookmarks(items: BookmarkItem[]): void {
-    if (this.isNative) {
-      void this.saveBookmarksToPreferences(items);
-    } else {
-      this.saveBookmarksToCookie(items);
     }
   }
 
@@ -487,10 +475,12 @@ faFolderPlus = faFolderPlus;
       window.alert('Pedir permiso solo está disponible desde el dispositivo.');
       return;
     }
+    const profileId = this.activeProfileId();
     const bookmark = this.bookmarks()[index];
     if (!bookmark) {
       return;
     }
+    const bookmarkIdentity = this.bookmarkIdentity(bookmark);
     let folder: PickedFolder;
     if (bookmark.treeUri && bookmark.treeUri.includes('/tree/')) {
        const startDocumentUri = this.startDocumentUriForTree(bookmark.treeUri, bookmark.treePath);
@@ -510,16 +500,21 @@ faFolderPlus = faFolderPlus;
       }
       folder = picked;
     }
-    this.bookmarks.update((current) =>
-      current.map((item, i) =>
-        i === index
-          ? { ...item, path: folder.path, treeUri: folder.treeUri, treePath: folder.treePath }
-          : item,
-      ),
+    const currentBookmarks = this.bookmarksForProfile(profileId);
+    const currentIndex = currentBookmarks.findIndex((item) => this.bookmarkIdentity(item) === bookmarkIdentity);
+    if (currentIndex === -1) {
+      return;
+    }
+    const updatedBookmarks = currentBookmarks.map((item, i) =>
+      i === currentIndex
+        ? { ...item, path: folder.path, treeUri: folder.treeUri, treePath: folder.treePath }
+        : item,
     );
-    this.saveBookmarks(this.bookmarks());
-    this.bookmarksChange.emit(this.bookmarks());
-    if (this.selectedBookmarkIndex() === index) {
+    if (this.activeProfileId() === profileId) {
+      this.bookmarks.set(updatedBookmarks);
+    }
+    this.emitBookmarksChange(updatedBookmarks, profileId);
+    if (this.activeProfileId() === profileId && this.selectedBookmarkIndex() === currentIndex) {
       this.selectedPathAddBookMark.set(folder.path);
       this.pendingBookmarkTree.set({ treeUri: folder.treeUri, treePath: folder.treePath });
     }
@@ -537,8 +532,7 @@ faFolderPlus = faFolderPlus;
     }
     this.selectedBookmarkIndex.set(selected);
     this.editingBookmark.set(count > 0);
-    this.saveBookmarks(this.bookmarks());
-    this.bookmarksChange.emit(this.bookmarks());
+    this.emitBookmarksChange();
     const bookmark = this.bookmarks()[selected];
     if (bookmark) {
       this.selectedPathAddBookMark.set(bookmark.path);
@@ -558,6 +552,7 @@ faFolderPlus = faFolderPlus;
   }
 
   async onAddBookmarkFolder(): Promise<void> {
+    const profileId = this.activeProfileId();
     try {
       const newBookmarks: BookmarkItem[] = [];
       if (this.isNative) {
@@ -594,16 +589,19 @@ faFolderPlus = faFolderPlus;
         window.alert('La carpeta seleccionada no contiene subcarpetas de primer nivel.');
         return;
       }
-      const existing = new Set(this.bookmarks().map((bookmark) => `${bookmark.treeUri ?? ''}|${bookmark.treePath ?? bookmark.path}`));
+      const currentBookmarks = this.bookmarksForProfile(profileId);
+      const existing = new Set(currentBookmarks.map((bookmark) => this.bookmarkIdentity(bookmark)));
       const additions = newBookmarks.filter((bookmark) => {
-        const key = `${bookmark.treeUri ?? ''}|${bookmark.treePath ?? bookmark.path}`;
+        const key = this.bookmarkIdentity(bookmark);
         if (existing.has(key)) return false;
         existing.add(key);
         return true;
       });
-      this.bookmarks.update((current) => [...current, ...additions]);
-      this.saveBookmarks(this.bookmarks());
-      this.bookmarksChange.emit(this.bookmarks());
+      const updatedBookmarks = [...currentBookmarks, ...additions];
+      if (this.activeProfileId() === profileId) {
+        this.bookmarks.set(updatedBookmarks);
+      }
+      this.emitBookmarksChange(updatedBookmarks, profileId);
       if (!additions.length) window.alert('Las subcarpetas ya estaban agregadas como marcadores.');
     } catch (error) {
       const reason = error as { name?: string; message?: string };

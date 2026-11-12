@@ -18,21 +18,25 @@
           class="fb-item"
           [class.fb-directory]="entry.kind === 'directory'"
           [class.fb-item-marked]="isEntryMarked(entry.path)">
-          @for (slot of bookmarkSlots(); track $index) {
-            <button
-              type="button"
-              class="fb-bookmark fb-bookmark-{{ slot.position.edge }}"
-              [class.fb-bookmark-selected]="isBookmarkSelected(entry.path, $index)"
-              [class.fb-bookmark-denied]="bookmarkDenied(slot.bookmark)"
-              [ngStyle]="bookmarkStyle(slot.position)"
-              [attr.title]="bookmarkDenied(slot.bookmark) ? slot.bookmark.name + ' (sin permiso)' : slot.bookmark.name"
-              [attr.aria-label]="slot.bookmark.name"
-              (click)="onFileBrowserClick(entry.path, $index)"
-              (pointerdown)="startLongPressTooltip($event, entry.path, $index)"
-              (pointerup)="cancelLongPressTooltip()"
-              (pointerleave)="cancelLongPressTooltip()">
-              <fa-icon [icon]="slot.bookmark.icon" class="fa-icon"></fa-icon>
-            </button>
+          @for (group of bookmarkGroups(); track group.profileId + ':' + group.contentKey) {
+            <span class="fb-bookmark-group" [hidden]="group.profileId !== activeProfileId()">
+              @for (slot of group.slots; track $index) {
+                <button
+                  type="button"
+                  class="fb-bookmark fb-bookmark-{{ slot.position.edge }}"
+                  [class.fb-bookmark-selected]="isBookmarkSelected(entry.path, $index, group.profileId)"
+                  [class.fb-bookmark-denied]="slot.denied"
+                  [ngStyle]="slot.style"
+                  [attr.title]="slot.denied ? slot.bookmark.name + ' (sin permiso)' : slot.bookmark.name"
+                  [attr.aria-label]="slot.bookmark.name"
+                  (click)="onFileBrowserClick(entry.path, $index, group.profileId)"
+                  (pointerdown)="startLongPressTooltip($event, entry.path, $index)"
+                  (pointerup)="cancelLongPressTooltip()"
+                  (pointerleave)="cancelLongPressTooltip()">
+                  <fa-icon [icon]="slot.bookmark.icon" class="fa-icon"></fa-icon>
+                </button>
+              }
+            </span>
           }
           <div class="fb-thumb-zone" (click)="onItemClick(entry)">
             @if (entry.isImage && entry.thumb) {
